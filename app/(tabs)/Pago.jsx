@@ -274,7 +274,7 @@ export default function Pago() {
                   )}\n`
                 : "Confirmar Registro"
         const confirmacionMensaje = `¿Confirma que desea registrar un ${tipoSeleccionado?.descripcion.toLowerCase()} de ${montoFormateado} para el crédito ${credito}?`
-
+        // Prueba cambio repositorio
         // Mostrar confirmación antes de procesar
         alerta(titulo, confirmacionMensaje, [
             {
