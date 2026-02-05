@@ -1,12 +1,11 @@
 import { Pressable, Text, Linking, Platform } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import { COLORS } from "../constants"
 import { useCustomAlert } from "../hooks/useCustomAlert"
 import CustomAlert from "./CustomAlert"
 
 export default function ContactSupport() {
     const { alertRef, showInfo, showError } = useCustomAlert()
-    const phoneNumber = "+5215650921242"
+    const phoneNumber = "+5215641709620"
 
     const handleWhatsApp = () => {
         showInfo(
