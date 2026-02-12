@@ -19,6 +19,7 @@ import { usePago } from "../../context/PagoContext"
 import { pagosPendientes, catalogos, registroPagos } from "../../services"
 import CustomAlert from "../../components/CustomAlert"
 import * as ImagePicker from "expo-image-picker"
+import * as ImageManipulator from "expo-image-manipulator"
 import * as Location from "expo-location"
 import { generarIdPago } from "../../utils/pagoId"
 import storage from "../../utils/storage"
@@ -295,93 +296,36 @@ export default function Pago() {
                         // Obtener ubicación antes de guardar el pago
                         const ubicacion = await obtenerUbicacion()
                         if (!ubicacion) {
-                            // Si no se pudo obtener la ubicación, no continuar
+                            // Si no se pudo obtener la ubicación, preguntar si desea continuar
                             hideWait()
+                            showWarning(
+                                "Sin Ubicación",
+                                "No se pudo obtener la ubicación GPS. ¿Desea registrar el pago sin ubicación? (Solo use esta opción en zonas sin señal)",
+                                [
+                                    {
+                                        text: "Cancelar",
+                                        style: "cancel",
+                                        onPress: () => {
+                                            // No hacer nada, volver al formulario
+                                        }
+                                    },
+                                    {
+                                        text: "Continuar sin GPS",
+                                        style: "default",
+                                        onPress: async () => {
+                                            // Continuar con ubicación por defecto
+                                            await guardarPagoConUbicacion({
+                                                latitud: 0,
+                                                longitud: 0
+                                            })
+                                        }
+                                    }
+                                ]
+                            )
                             return
                         }
 
-                        // Obtener información del usuario actual
-                        const usuario = await storage.getUser()
-                        const usuarioId = usuario?.id_usuario || "UNKNOWN"
-
-                        // Generar ID único para el pago
-                        const fechaCaptura = new Date()
-                        const idPago = await generarIdPago(credito, fechaCaptura, usuarioId, monto)
-
-                        // Preparar los datos del pago
-                        const pagoData = {
-                            id: idPago,
-                            credito,
-                            ciclo,
-                            monto,
-                            comentarios,
-                            tipoPago: tipoPago, // código del tipo
-                            tipoEtiqueta: tipoSeleccionado?.descripcion || tipoPago, // etiqueta para mostrar
-                            nombreCliente: infoCredito?.nombre || params.nombre || "",
-                            fotoComprobante: fotoComprobante?.uri || null,
-                            latitud: ubicacion.latitud,
-                            longitud: ubicacion.longitud,
-                            fechaCaptura: fechaCaptura,
-                            fechaDiaPago: infoCredito?.fecha_dia_pago || params.fechaDiaPago || "",
-                            usuarioId: usuarioId
-                        }
-
-                        // Intentar enviar directamente al servidor primero
-                        try {
-                            const resultadoServidor = await registroPagos.registrarPago(pagoData)
-
-                            if (resultadoServidor.success) {
-                                hideWait()
-                                const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} registrado exitosamente en el servidor`
-
-                                showSuccess("¡Pago Registrado!", mensaje, [
-                                    {
-                                        text: "OK",
-                                        style: "default",
-                                        onPress: () => {
-                                            limpiarFormulario()
-                                            if (esDetalleCredito) {
-                                                router.push("/(screens)/DetalleCredito")
-                                            } else {
-                                                router.replace("/(tabs)/Cartera")
-                                            }
-                                        }
-                                    }
-                                ])
-                                return
-                            }
-                        } catch (error) {
-                            console.log("Error al enviar al servidor, guardando localmente:", error)
-                        }
-
-                        // Si llegamos aquí, no se pudo enviar al servidor
-                        // Guardar en storage local como pendiente
-                        const resultado = await pagosPendientes.guardar(pagoData)
-
-                        if (resultado.success) {
-                            hideWait()
-                            const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} guardado localmente, debe realizar la sincronización manual después.`
-
-                            showInfo("Pago Guardado Localmente", mensaje, [
-                                {
-                                    text: "OK",
-                                    style: "default",
-                                    onPress: () => {
-                                        limpiarFormulario()
-                                        if (esDetalleCredito) {
-                                            router.push("/(screens)/DetalleCredito")
-                                        } else {
-                                            router.replace("/(tabs)/Cartera")
-                                        }
-                                    }
-                                }
-                            ])
-                        } else {
-                            hideWait()
-                            showError("Error", "No se pudo guardar el pago. Inténtelo de nuevo.", [
-                                { text: "OK", style: "default" }
-                            ])
-                        }
+                        await guardarPagoConUbicacion(ubicacion)
                     } catch (error) {
                         console.error("Error al procesar pago:", error)
                         hideWait()
@@ -392,6 +336,105 @@ export default function Pago() {
                 }
             }
         ])
+    }
+
+    // Función auxiliar para guardar el pago con ubicación
+    const guardarPagoConUbicacion = async (ubicacion) => {
+        try {
+            showWait("Procesando Pago", "Registrando el pago, por favor espere...")
+
+            // Obtener información del usuario actual
+            const usuario = await storage.getUser()
+            const usuarioId = usuario?.id_usuario || "UNKNOWN"
+
+            // Generar ID único para el pago
+            const fechaCaptura = new Date()
+            const idPago = await generarIdPago(credito, fechaCaptura, usuarioId, monto)
+
+            // Obtener el tipo seleccionado para la etiqueta
+            const tipoSeleccionado = tiposPago.find((t) => t.codigo === tipoPago)
+
+            // Preparar los datos del pago
+            const pagoData = {
+                id: idPago,
+                credito,
+                ciclo,
+                monto,
+                comentarios,
+                tipoPago: tipoPago, // código del tipo
+                tipoEtiqueta: tipoSeleccionado?.descripcion || tipoPago, // etiqueta para mostrar
+                nombreCliente: infoCredito?.nombre || params.nombre || "",
+                fotoComprobante: fotoComprobante?.uri || null,
+                latitud: ubicacion.latitud,
+                longitud: ubicacion.longitud,
+                fechaCaptura: fechaCaptura,
+                fechaDiaPago: infoCredito?.fecha_dia_pago || params.fechaDiaPago || "",
+                usuarioId: usuarioId
+            }
+
+            // Intentar enviar directamente al servidor primero
+            try {
+                const resultadoServidor = await registroPagos.registrarPago(pagoData)
+
+                if (resultadoServidor.success) {
+                    hideWait()
+                    const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} registrado exitosamente en el servidor`
+
+                    showSuccess("¡Pago Registrado!", mensaje, [
+                        {
+                            text: "OK",
+                            style: "default",
+                            onPress: () => {
+                                limpiarFormulario()
+                                if (esDetalleCredito) {
+                                    router.push("/(screens)/DetalleCredito")
+                                } else {
+                                    router.replace("/(tabs)/Cartera")
+                                }
+                            }
+                        }
+                    ])
+                    return
+                }
+            } catch (error) {
+                console.log("Error al enviar al servidor, guardando localmente:", error)
+            }
+
+            // Si llegamos aquí, no se pudo enviar al servidor
+            // Guardar en storage local como pendiente
+            const resultado = await pagosPendientes.guardar(pagoData)
+
+            if (resultado.success) {
+                hideWait()
+                const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} guardado localmente, debe realizar la sincronización manual después.`
+
+                showInfo("Pago Guardado Localmente", mensaje, [
+                    {
+                        text: "OK",
+                        style: "default",
+                        onPress: () => {
+                            limpiarFormulario()
+                            if (esDetalleCredito) {
+                                router.push("/(screens)/DetalleCredito")
+                            } else {
+                                router.replace("/(tabs)/Cartera")
+                            }
+                        }
+                    }
+                ])
+            } else {
+                hideWait()
+                showError("Error", "No se pudo guardar el pago. Inténtelo de nuevo.", [
+                    { text: "OK", style: "default" }
+                ])
+            }
+        } catch (error) {
+            console.error("Error en guardarPagoConUbicacion:", error)
+            hideWait()
+            showError("Error", "Ocurrió un error inesperado al guardar el pago.", [
+                { text: "OK", style: "default" }
+            ])
+        }
     }
 
     const formatearMonto = (valor) => {
@@ -413,11 +456,36 @@ export default function Pago() {
             }
 
             const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ["images"]
+                mediaTypes: ["images"],
+                quality: 0.8, // Calidad inicial al 80%
+                exif: false, // No incluir metadatos EXIF para reducir peso
+                allowsEditing: false // Permitir recortar
+                //aspect: [4, 3] // Relación de aspecto 4:3
             })
 
             if (!result.canceled) {
-                setFotoComprobante(result.assets[0])
+                // Comprimir y redimensionar la imagen para reducir el peso
+                const manipulatedImage = await ImageManipulator.manipulateAsync(
+                    result.assets[0].uri,
+                    [
+                        // Redimensionar si es muy grande (máximo 1024px de ancho)
+                        { resize: { width: 1024 } }
+                    ],
+                    {
+                        compress: 0.75, // Comprimir al 75% de calidad (WebP tolera más compresión)
+                        format: ImageManipulator.SaveFormat.WEBP // WebP: mejor que JPEG, 25-35% más liviano
+                    }
+                )
+
+                // Crear objeto con la imagen optimizada
+                const imagenOptimizada = {
+                    ...result.assets[0],
+                    uri: manipulatedImage.uri,
+                    width: manipulatedImage.width,
+                    height: manipulatedImage.height
+                }
+
+                setFotoComprobante(imagenOptimizada)
                 showSuccess("¡Foto Capturada!", "El comprobante ha sido capturado correctamente", [
                     { text: "OK", style: "default" }
                 ])
@@ -444,11 +512,11 @@ export default function Pago() {
                 return null
             }
 
-            // Obtener ubicación actual
+            // Obtener ubicación actual con configuración más flexible
             const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.High,
-                timeout: 10000,
-                maximumAge: 60000
+                accuracy: Location.Accuracy.Balanced, // Cambio de High a Balanced para mejor compatibilidad
+                timeout: 15000, // Aumentado a 15 segundos
+                maximumAge: 120000 // Permitir ubicación de hasta 2 minutos de antigüedad
             })
 
             return {
@@ -456,10 +524,42 @@ export default function Pago() {
                 longitud: location.coords.longitude
             }
         } catch (error) {
-            console.error("Error al obtener ubicación:", error)
-            showError("Error", "No se pudo obtener la ubicación. Inténtelo de nuevo.", [
-                { text: "OK", style: "default" }
-            ])
+            // Logging detallado del error para diagnóstico
+            console.error("=== ERROR DETALLADO DE UBICACIÓN ===")
+            console.error("Tipo de error:", error.name)
+            console.error("Mensaje:", error.message)
+            console.error("Código:", error.code)
+            console.error("Objeto completo:", JSON.stringify(error, null, 2))
+            console.error("=====================================")
+
+            // Determinar mensaje específico según el tipo de error
+            let titulo = "Error de Ubicación"
+            let mensaje = "No se pudo obtener la ubicación."
+
+            if (error.message?.includes("timeout") || error.code === "E_TIMEOUT") {
+                titulo = "Tiempo de espera agotado"
+                mensaje =
+                    "No se pudo obtener la ubicación en el tiempo esperado. Verifique que el GPS esté activado."
+            } else if (
+                error.message?.includes("Location provider is unavailable") ||
+                error.code === "E_LOCATION_UNAVAILABLE"
+            ) {
+                titulo = "GPS No Disponible"
+                mensaje =
+                    "El servicio de ubicación no está disponible. Active el GPS en la configuración de su dispositivo."
+            } else if (error.message?.includes("network") || error.message?.includes("Network")) {
+                titulo = "Sin Señal"
+                mensaje =
+                    "No se pudo obtener la ubicación por falta de señal. Intente moverse a un área con mejor cobertura."
+            } else if (error.code === "E_LOCATION_SERVICES_DISABLED") {
+                titulo = "Servicios de Ubicación Desactivados"
+                mensaje = "Active los servicios de ubicación en la configuración de su dispositivo."
+            }
+
+            // Agregar el mensaje técnico al final para el personal en campo
+            mensaje += `\n\nError técnico: ${error.message || "Desconocido"}`
+
+            showError(titulo, mensaje, [{ text: "OK", style: "default" }])
             return null
         }
     }
@@ -507,12 +607,12 @@ export default function Pago() {
                                             esDetalleCredito
                                                 ? "bg-gray-50 border-gray-200"
                                                 : creditoValido === true
-                                                ? "border-green-400 bg-green-50"
-                                                : creditoValido === false
-                                                ? "border-red-400 bg-red-50"
-                                                : focusedField === "credito"
-                                                ? "border-blue-400 bg-blue-50"
-                                                : "border-gray-300 bg-white"
+                                                  ? "border-green-400 bg-green-50"
+                                                  : creditoValido === false
+                                                    ? "border-red-400 bg-red-50"
+                                                    : focusedField === "credito"
+                                                      ? "border-blue-400 bg-blue-50"
+                                                      : "border-gray-300 bg-white"
                                         }`}
                                     >
                                         <View className="flex-row items-center">
@@ -546,8 +646,8 @@ export default function Pago() {
                                             esDetalleCredito
                                                 ? "bg-gray-50 border-gray-200"
                                                 : focusedField === "ciclo"
-                                                ? "border-blue-400 bg-blue-50"
-                                                : "border-gray-300 bg-white"
+                                                  ? "border-blue-400 bg-blue-50"
+                                                  : "border-gray-300 bg-white"
                                         }`}
                                     >
                                         <TextInput
