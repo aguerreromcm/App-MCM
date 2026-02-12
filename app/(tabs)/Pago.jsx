@@ -21,6 +21,7 @@ import CustomAlert from "../../components/CustomAlert"
 import * as ImagePicker from "expo-image-picker"
 import * as ImageManipulator from "expo-image-manipulator"
 import * as Location from "expo-location"
+import * as FileSystem from "expo-file-system"
 import { generarIdPago } from "../../utils/pagoId"
 import storage from "../../utils/storage"
 
@@ -143,7 +144,12 @@ export default function Pago() {
         ]).start()
     }
 
-    const limpiarFormulario = () => {
+    const limpiarFormulario = async () => {
+        // Limpiar archivo temporal de foto si existe
+        if (fotoComprobante?.uri) {
+            await limpiarFotoTemporal(fotoComprobante.uri)
+        }
+
         // Siempre limpiar todos los campos
         setCredito("")
         setCiclo("")
@@ -380,6 +386,11 @@ export default function Pago() {
                     hideWait()
                     const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} registrado exitosamente en el servidor`
 
+                    // Limpiar foto temporal después de envío exitoso
+                    if (fotoComprobante?.uri) {
+                        await limpiarFotoTemporal(fotoComprobante.uri)
+                    }
+
                     showSuccess("¡Pago Registrado!", mensaje, [
                         {
                             text: "OK",
@@ -407,6 +418,9 @@ export default function Pago() {
             if (resultado.success) {
                 hideWait()
                 const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} guardado localmente, debe realizar la sincronización manual después.`
+
+                // NO limpiar foto temporal aquí porque se guardó localmente y se necesita para sincronizar
+                // La limpieza se hará cuando se sincronice o se descarte el pago
 
                 showInfo("Pago Guardado Localmente", mensaje, [
                     {
@@ -442,6 +456,23 @@ export default function Pago() {
         return numero
     }
 
+    // Función para limpiar archivos temporales de fotos
+    const limpiarFotoTemporal = async (uri) => {
+        try {
+            // Solo intentar borrar si es un archivo temporal (no una URI de assets)
+            if (uri && uri.startsWith("file://")) {
+                const fileInfo = await FileSystem.getInfoAsync(uri)
+                if (fileInfo.exists) {
+                    await FileSystem.deleteAsync(uri, { idempotent: true })
+                    console.log("Foto temporal eliminada:", uri)
+                }
+            }
+        } catch (error) {
+            // No es crítico si falla, solo log
+            console.log("No se pudo eliminar foto temporal:", error.message)
+        }
+    }
+
     const capturarFoto = async () => {
         try {
             const { status } = await ImagePicker.requestCameraPermissionsAsync()
@@ -453,6 +484,12 @@ export default function Pago() {
                     [{ text: "OK", style: "default" }]
                 )
                 return
+            }
+
+            // IMPORTANTE: Limpiar la foto anterior antes de capturar una nueva
+            // Esto previene acumulación de memoria que causa crash después de 4-5 fotos
+            if (fotoComprobante?.uri) {
+                await limpiarFotoTemporal(fotoComprobante.uri)
             }
 
             const result = await ImagePicker.launchCameraAsync({
@@ -476,6 +513,11 @@ export default function Pago() {
                         format: ImageManipulator.SaveFormat.WEBP // WebP: mejor que JPEG, 25-35% más liviano
                     }
                 )
+
+                // Limpiar imagen original del ImagePicker (ya no se necesita)
+                if (result.assets[0].uri !== manipulatedImage.uri) {
+                    await limpiarFotoTemporal(result.assets[0].uri)
+                }
 
                 // Crear objeto con la imagen optimizada
                 const imagenOptimizada = {
