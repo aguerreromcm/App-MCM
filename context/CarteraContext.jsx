@@ -20,9 +20,9 @@ export const CarteraProvider = ({ children }) => {
     const obtenerCartera = async (forzarActualizacion = false) => {
         try {
             // Solo actualizar si no hay datos o si se fuerza la actualización
-            // o si han pasado más de 5 minutos desde la última actualización
+            // o si han pasado más de 24 horas desde la última actualización
             const ahora = Date.now()
-            const tiempoLimite = 5 * 60 * 1000 // 5 minutos
+            const tiempoLimite = 24 * 60 * 60 * 1000 // 24 horas
 
             if (
                 !forzarActualizacion &&
