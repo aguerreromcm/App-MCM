@@ -9,21 +9,6 @@ const TIPOS_PAGO_DEFAULT = [
     { codigo: "M", descripcion: "MULTA" }
 ]
 
-/**
- * Estructura esperada del endpoint /ConsultaClientesEjecutivo:
- * {
- *   clientes: [
- *     {
- *       cdgns: "123456",           // Número de crédito
- *       nombre: "Juan Pérez",      // Nombre del cliente
- *       ciclo: 1,                  // Ciclo actual
- *       pago_semanal: 150.00,      // NUEVO CAMPO: Pago semanal del cliente
- *       // ... otros campos existentes
- *     }
- *   ]
- * }
- */
-
 export default {
     getClientesEjecutivo: async () => {
         const token = await storage.getToken()

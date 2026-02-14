@@ -40,8 +40,18 @@ export default function TarjetaResumenOperacion({
     return (
         <Pressable
             onPress={onToggle}
-            className="bg-white rounded-2xl shadow-md p-4 mb-4 border border-gray-200"
+            className={`bg-white rounded-2xl shadow-md p-4 mb-4 border ${
+                operacion._esPendiente ? "border-orange-400 border-2" : "border-gray-200"
+            }`}
         >
+            {/* Badge de pago pendiente */}
+            {operacion._esPendiente && (
+                <View className="absolute top-2 right-2 bg-orange-500 px-2 py-1 rounded-full flex-row items-center">
+                    <Feather name="clock" size={12} color="white" />
+                    <Text className="text-white text-xs font-semibold ml-1">En local</Text>
+                </View>
+            )}
+
             <View className="flex-row justify-between items-center">
                 <View className="flex-1">
                     <Text className="font-semibold text-base">

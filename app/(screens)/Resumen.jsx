@@ -4,17 +4,20 @@ import { Feather, MaterialIcons } from "@expo/vector-icons"
 import { router } from "expo-router"
 import { SafeAreaInsetsContext } from "react-native-safe-area-context"
 import { useCustomAlert } from "../../hooks/useCustomAlert"
-import { resumenDiario } from "../../services"
+import { useCartera } from "../../context/CarteraContext"
+import { resumenDiario, pagosPendientes, catalogos } from "../../services"
 import CustomAlert from "../../components/CustomAlert"
 import DateSelector from "../../components/DateSelector"
 import MapModal from "../../components/MapModal"
 import TarjetaResumenOperacion from "../../components/TarjetaResumenOperacion"
 import storage from "../../utils/storage"
 import numeral from "numeral"
+import { dateShortBack, dateShortFront, dateTimeFront } from "../../utils/date"
 
 export default function Resumen() {
     const insets = useContext(SafeAreaInsetsContext)
-    const { alertRef, showError, showWait, hideWait } = useCustomAlert()
+    const { alertRef, showError, showWait, hideWait, showInfo } = useCustomAlert()
+    const { obtenerDetalleOperaciones, obtenerResumenDiario, lastUpdate } = useCartera()
     const [expandedId, setExpandedId] = useState(null)
 
     // Estados para el usuario
@@ -97,28 +100,81 @@ export default function Resumen() {
         try {
             showWait("Cargando Resumen", "Obteniendo los datos de pagos registrados...")
 
-            const fechaInicioStr = fechaInicio.toISOString().split("T")[0]
-            const fechaFinStr = fechaFin.toISOString().split("T")[0]
-
-            const resultado = await resumenDiario.obtenerResumen(fechaInicioStr, fechaFinStr)
-
-            hideWait()
+            const resultado = await resumenDiario.obtenerResumen(
+                dateShortBack(fechaInicio),
+                dateShortBack(fechaFin)
+            )
 
             if (resultado.success) {
                 setResumenData(resultado.data.resumen_diario)
                 setOperaciones(resultado.data.detalle_operaciones || [])
                 setMostrarTodos(false)
-                // Ocultar búsqueda después de búsqueda exitosa
                 setMostrarBusqueda(false)
             } else {
-                showError("Error", resultado.error || "No se pudo obtener el resumen")
+                await usarDatosFallback()
+            }
+        } catch (error) {
+            await usarDatosFallback()
+        } finally {
+            hideWait()
+        }
+    }
+
+    // Usar datos del contexto y pagos pendientes locales como fallback
+    const usarDatosFallback = async () => {
+        try {
+            const resumenCache = obtenerResumenDiario()
+            const operacionesCache = obtenerDetalleOperaciones() || []
+            const pagosPendientesLocal = await pagosPendientes.obtenerTodos()
+            const tipos = await catalogos.getTiposPagoLocal()
+            let montoLocal = 0
+
+            pagosPendientesLocal.forEach((pago) => {
+                montoLocal += parseFloat(pago.monto)
+                operacionesCache.unshift({
+                    cdgns: pago.credito,
+                    ciclo: pago.ciclo,
+                    comentarios_ejecutivo: pago.comentarios,
+                    fecha: dateShortFront(pago.fechaCaptura),
+                    fregistro: dateTimeFront(pago.fechaCaptura),
+                    latitud: pago.latitud,
+                    longitud: pago.longitud,
+                    monto: pago.monto,
+                    nombre: pago.nombreCliente,
+                    secuencia: 0,
+                    tipo:
+                        tipos.find((t) => t.codigo === pago.tipoPago)?.descripcion || "Desconocido",
+                    _esPendiente: true
+                })
+            })
+
+            resumenCache.total_operaciones += pagosPendientesLocal.length
+            resumenCache.monto_total = parseFloat(resumenCache.monto_total) + montoLocal
+
+            setResumenData(resumenCache)
+            setOperaciones(operacionesCache)
+            setMostrarTodos(false)
+            setMostrarBusqueda(false)
+
+            if (operacionesCache.length > 0 || pagosPendientesLocal.length > 0) {
+                showInfo(
+                    "Datos Locales",
+                    `No se pudo conectar al servidor, mostrando datos locales.`,
+                    [{ text: "OK", style: "default" }]
+                )
+            } else {
+                showError("Sin Datos", "No hay información disponible para mostrar", [
+                    { text: "OK", style: "default" }
+                ])
                 setResumenData(null)
                 setOperaciones([])
             }
         } catch (error) {
             hideWait()
-            console.error("Error al buscar resumen:", error)
-            showError("Error", "Ocurrió un error al obtener el resumen")
+            console.error("Error al cargar datos de fallback:", error)
+            showError("Error", "No se pudieron cargar los datos locales", [
+                { text: "OK", style: "default" }
+            ])
         }
     }
 
@@ -195,7 +251,7 @@ export default function Resumen() {
                 </Pressable>
                 <Text className="flex-1 text-white text-lg font-semibold">
                     Mis pagos registrados
-                </Text>{" "}
+                </Text>
                 <Pressable onPress={() => setMostrarBusqueda(!mostrarBusqueda)} className="p-2">
                     <MaterialIcons name="search" size={24} color="white" />
                 </Pressable>
@@ -407,6 +463,7 @@ export default function Resumen() {
                                         onVerUbicacion={mostrarUbicacion}
                                     />
                                 )}
+                                scrollEnabled={false}
                                 showsVerticalScrollIndicator={false}
                                 className="pt-2"
                             />

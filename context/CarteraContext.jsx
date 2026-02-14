@@ -15,6 +15,8 @@ export const CarteraProvider = ({ children }) => {
     const [clientes, setClientes] = useState([])
     const [loading, setLoading] = useState(false)
     const [lastUpdate, setLastUpdate] = useState(null)
+    const [detalleOperaciones, setDetalleOperaciones] = useState([])
+    const [resumenDiario, setResumenDiario] = useState(null)
 
     // Función para obtener todos los créditos de la cartera
     const obtenerCartera = async (forzarActualizacion = false) => {
@@ -36,8 +38,12 @@ export const CarteraProvider = ({ children }) => {
             setLoading(true)
             const respuesta = await catalogos.getClientesEjecutivo()
             const nuevosClientes = respuesta.data.clientes || []
+            const operaciones = respuesta.data.detalle_operaciones || []
+            const resumen = respuesta.data.resumen_diario || null
 
             setClientes(nuevosClientes)
+            setDetalleOperaciones(operaciones)
+            setResumenDiario(resumen)
             setLastUpdate(ahora)
 
             return { success: true, data: nuevosClientes }
@@ -76,9 +82,21 @@ export const CarteraProvider = ({ children }) => {
         return clientes.find((cliente) => cliente.cdgns === numeroCredito) || null
     }
 
+    // Función para obtener detalle de operaciones del cache
+    const obtenerDetalleOperaciones = () => {
+        return detalleOperaciones ? [...detalleOperaciones] : []
+    }
+
+    // Función para obtener resumen diario del cache
+    const obtenerResumenDiario = () => {
+        return resumenDiario ? { ...resumenDiario } : null
+    }
+
     // Función para limpiar la caché
     const limpiarCache = () => {
         setClientes([])
+        setDetalleOperaciones([])
+        setResumenDiario(null)
         setLastUpdate(null)
     }
 
@@ -91,9 +109,13 @@ export const CarteraProvider = ({ children }) => {
         clientes,
         loading,
         lastUpdate,
+        detalleOperaciones,
+        resumenDiario,
         obtenerCartera,
         validarCredito,
         obtenerInfoCredito,
+        obtenerDetalleOperaciones,
+        obtenerResumenDiario,
         limpiarCache
     }
 
