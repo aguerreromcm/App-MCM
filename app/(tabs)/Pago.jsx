@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react"
+import { useContext, useState, useEffect, useRef } from "react"
 import {
     View,
     Text,
@@ -7,7 +7,8 @@ import {
     ScrollView,
     Animated,
     Image,
-    Platform
+    Platform,
+    Modal
 } from "react-native"
 import { useLocalSearchParams, router } from "expo-router"
 import { Feather, MaterialIcons } from "@expo/vector-icons"
@@ -18,8 +19,8 @@ import { useCartera } from "../../context/CarteraContext"
 import { usePago } from "../../context/PagoContext"
 import { pagosPendientes, catalogos, registroPagos } from "../../services"
 import CustomAlert from "../../components/CustomAlert"
-import * as ImagePicker from "expo-image-picker"
 import * as ImageManipulator from "expo-image-manipulator"
+import { CameraView, useCameraPermissions } from "expo-camera"
 import * as Location from "expo-location"
 import * as FileSystem from "expo-file-system"
 import { generarIdPago } from "../../utils/pagoId"
@@ -56,6 +57,13 @@ export default function Pago() {
 
     const scaleAnim = useState(new Animated.Value(1))[0]
     const shakeAnim = useState(new Animated.Value(0))[0]
+
+    // Estados y ref para la cámara in-app
+    const [camaraVisible, setCamaraVisible] = useState(false)
+    const [camaraLista, setCamaraLista] = useState(false)
+    const [camaraCargando, setCamaraCargando] = useState(false)
+    const [permisosCamara, solicitarPermisosCamara] = useCameraPermissions()
+    const camaraRef = useRef(null)
 
     const esDetalleCredito = tieneContextoPago()
 
@@ -475,65 +483,79 @@ export default function Pago() {
 
     const capturarFoto = async () => {
         try {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync()
-
-            if (status !== "granted") {
-                showError(
-                    "Permisos Requeridos",
-                    "Se necesitan permisos de cámara para capturar el comprobante",
-                    [{ text: "OK", style: "default" }]
-                )
-                return
+            // Verificar/solicitar permisos
+            if (!permisosCamara?.granted) {
+                const resultado = await solicitarPermisosCamara()
+                if (!resultado.granted) {
+                    showError(
+                        "Permisos Requeridos",
+                        "Se necesitan permisos de cámara para capturar el comprobante",
+                        [{ text: "OK", style: "default" }]
+                    )
+                    return
+                }
             }
 
-            // IMPORTANTE: Limpiar la foto anterior antes de capturar una nueva
-            // Esto previene acumulación de memoria que causa crash después de 4-5 fotos
+            // Limpiar foto anterior de memoria antes de abrir cámara
             if (fotoComprobante?.uri) {
                 await limpiarFotoTemporal(fotoComprobante.uri)
+                setFotoComprobante(null)
             }
 
-            const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ["images"],
-                quality: 0.8, // Calidad inicial al 80%
-                exif: false, // No incluir metadatos EXIF para reducir peso
-                allowsEditing: false // Permitir recortar
-                //aspect: [4, 3] // Relación de aspecto 4:3
+            // Abrir la cámara in-app (no lanza actividad externa)
+            setCamaraLista(false)
+            setCamaraVisible(true)
+        } catch (error) {
+            console.error("Error al abrir cámara:", error)
+            showError("Error", "No se pudo abrir la cámara. Inténtelo de nuevo.", [
+                { text: "OK", style: "default" }
+            ])
+        }
+    }
+
+    const tomarFoto = async () => {
+        if (!camaraRef.current || !camaraLista || camaraCargando) return
+
+        try {
+            setCamaraCargando(true)
+
+            // Capturar foto directamente desde la cámara in-app
+            // skipProcessing: true para evitar procesamiento nativo pesado que causa crashes
+            const foto = await camaraRef.current.takePictureAsync({
+                quality: 0.85,
+                exif: false
             })
 
-            if (!result.canceled) {
-                // Comprimir y redimensionar la imagen para reducir el peso
-                const manipulatedImage = await ImageManipulator.manipulateAsync(
-                    result.assets[0].uri,
-                    [
-                        // Redimensionar si es muy grande (máximo 1024px de ancho)
-                        { resize: { width: 1024 } }
-                    ],
-                    {
-                        compress: 0.75, // Comprimir al 75% de calidad (WebP tolera más compresión)
-                        format: ImageManipulator.SaveFormat.WEBP // WebP: mejor que JPEG, 25-35% más liviano
-                    }
-                )
+            console.log("Foto capturada:", foto)
 
-                // Limpiar imagen original del ImagePicker (ya no se necesita)
-                if (result.assets[0].uri !== manipulatedImage.uri) {
-                    await limpiarFotoTemporal(result.assets[0].uri)
-                }
+            setCamaraVisible(false)
+            setCamaraCargando(false)
 
-                // Crear objeto con la imagen optimizada
-                const imagenOptimizada = {
-                    ...result.assets[0],
-                    uri: manipulatedImage.uri,
-                    width: manipulatedImage.width,
-                    height: manipulatedImage.height
-                }
+            // Comprimir y redimensionar
+            const manipulatedImage = await ImageManipulator.manipulateAsync(
+                foto.uri,
+                [{ resize: { width: 1024 } }],
+                { compress: 0.75, format: ImageManipulator.SaveFormat.WEBP }
+            )
 
-                setFotoComprobante(imagenOptimizada)
-                showSuccess("¡Foto Capturada!", "El comprobante ha sido capturado correctamente", [
-                    { text: "OK", style: "default" }
-                ])
+            // Limpiar imagen original ya que tenemos la comprimida
+            if (foto.uri !== manipulatedImage.uri) {
+                await limpiarFotoTemporal(foto.uri)
             }
+
+            setFotoComprobante({
+                uri: manipulatedImage.uri,
+                width: manipulatedImage.width,
+                height: manipulatedImage.height
+            })
+
+            showSuccess("¡Foto Capturada!", "El comprobante ha sido capturado correctamente", [
+                { text: "OK", style: "default" }
+            ])
         } catch (error) {
-            console.error("Error al capturar foto:", error)
+            setCamaraVisible(false)
+            setCamaraCargando(false)
+            console.error("Error al tomar foto:", error)
             showError("Error", "No se pudo capturar la foto. Inténtelo de nuevo.", [
                 { text: "OK", style: "default" }
             ])
@@ -942,6 +964,78 @@ export default function Pago() {
                 </View>
             </View>
             <CustomAlert ref={alertRef} />
+
+            {/* Modal de cámara in-app - evita lanzar actividad externa y crashes */}
+            {camaraVisible && (
+                <Modal
+                    visible={camaraVisible}
+                    animationType="slide"
+                    onRequestClose={() => {
+                        setCamaraVisible(false)
+                        setCamaraLista(false)
+                    }}
+                >
+                    <View className="flex-1 bg-black">
+                        <CameraView
+                            ref={camaraRef}
+                            style={{ flex: 1 }}
+                            facing="back"
+                            onCameraReady={() => {
+                                // Retardo para que el sensor ajuste exposición y balance de blancos
+                                setTimeout(() => setCamaraLista(true), 1500)
+                            }}
+                        />
+
+                        {/* Controles superpuestos */}
+                        <View className="absolute bottom-0 left-0 right-0 pb-10 pt-6 bg-black/50">
+                            <View className="flex-row justify-around items-center px-8">
+                                {/* Cancelar */}
+                                <Pressable
+                                    onPress={() => {
+                                        setCamaraVisible(false)
+                                        setCamaraLista(false)
+                                    }}
+                                    className="bg-white/20 rounded-full p-4"
+                                >
+                                    <MaterialIcons name="close" size={28} color="white" />
+                                </Pressable>
+
+                                {/* Botón captura */}
+                                <Pressable
+                                    onPress={tomarFoto}
+                                    disabled={!camaraLista || camaraCargando}
+                                    className={`rounded-full p-1 border-4 border-white ${
+                                        camaraCargando ? "opacity-50" : ""
+                                    }`}
+                                >
+                                    <View className="bg-white rounded-full w-16 h-16" />
+                                </Pressable>
+
+                                {/* Espacio para simetría */}
+                                <View className="w-14" />
+                            </View>
+
+                            {!camaraLista && (
+                                <Text className="text-white text-center mt-3 text-sm opacity-70">
+                                    Iniciando cámara...
+                                </Text>
+                            )}
+                            {camaraCargando && (
+                                <Text className="text-white text-center mt-3 text-sm">
+                                    Procesando foto...
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Guía visual */}
+                        <View className="absolute top-12 left-0 right-0 items-center">
+                            <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
+                                Enfoca el comprobante y presiona el botón
+                            </Text>
+                        </View>
+                    </View>
+                </Modal>
+            )}
         </View>
     )
 }
