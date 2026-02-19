@@ -977,9 +977,9 @@ export default function Pago() {
                             style={{ flex: 1 }}
                             facing="back"
                             onCameraReady={() => {
-                                // Retardo para que el sensor ajuste exposición y balance de blancos
                                 setTimeout(() => setCamaraLista(true), 1000)
                             }}
+                            autofocus="on"
                         />
 
                         {/* Controles superpuestos */}
