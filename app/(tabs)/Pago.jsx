@@ -19,12 +19,13 @@ import { useCartera } from "../../context/CarteraContext"
 import { usePago } from "../../context/PagoContext"
 import { pagosPendientes, catalogos, registroPagos } from "../../services"
 import CustomAlert from "../../components/CustomAlert"
-import { SaveFormat, useImageManipulator } from "expo-image-manipulator"
+import * as ImageManipulator from "expo-image-manipulator"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import * as Location from "expo-location"
 import * as FileSystem from "expo-file-system"
 import { generarIdPago } from "../../utils/pagoId"
 import storage from "../../utils/storage"
+import { fy } from "date-fns/locale"
 
 export default function Pago() {
     const params = useLocalSearchParams()
@@ -64,9 +65,6 @@ export default function Pago() {
     const [camaraCargando, setCamaraCargando] = useState(false)
     const [flashActivo, setFlashActivo] = useState(false)
     const [permisosCamara, solicitarPermisosCamara] = useCameraPermissions()
-    const [imagen, setImagen] = useState("")
-
-    const imageManipulator = useImageManipulator(imagen)
     const camaraRef = useRef(null)
 
     const esDetalleCredito = tieneContextoPago()
@@ -524,23 +522,17 @@ export default function Pago() {
             // skipProcessing: true para evitar procesamiento nativo pesado que causa crashes
             const foto = await camaraRef.current.takePictureAsync({
                 exif: false,
-                skipProcessing: true,
                 base64: false
             })
 
             // Comprimir y redimensionar
-            setImagen(foto.uri)
-            const imageRender = await imageManipulator.renderAsync()
-            const manipulatedImage = await imageRender.saveAsync({
-                base64: false,
+            const manipulatedImage = await ImageManipulator.manipulateAsync(foto.uri, [], {
+                format: ImageManipulator.SaveFormat.WEBP,
                 compress: 0.8,
-                format: SaveFormat.WEBP
+                base64: false
             })
 
-            // Limpiar imagen original ya que tenemos la comprimida
-            if (foto.uri !== manipulatedImage.uri) {
-                await limpiarFotoTemporal(foto.uri)
-            }
+            if (foto.uri !== manipulatedImage.uri) await limpiarFotoTemporal(foto.uri)
 
             setFotoComprobante({
                 uri: manipulatedImage.uri,
@@ -552,7 +544,6 @@ export default function Pago() {
                 { text: "OK", style: "default" }
             ])
         } catch (error) {
-            console.error("Error al capturar foto:", error)
             showError("Error", "No se pudo capturar la foto. Inténtelo de nuevo.", [
                 { text: "OK", style: "default" }
             ])
@@ -560,7 +551,6 @@ export default function Pago() {
             setCamaraVisible(false)
             setCamaraCargando(false)
             setFlashActivo(false)
-            setImagen("")
         }
     }
 
