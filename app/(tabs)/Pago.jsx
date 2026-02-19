@@ -19,7 +19,7 @@ import { useCartera } from "../../context/CarteraContext"
 import { usePago } from "../../context/PagoContext"
 import { pagosPendientes, catalogos, registroPagos } from "../../services"
 import CustomAlert from "../../components/CustomAlert"
-import * as ImageManipulator from "expo-image-manipulator"
+import { SaveFormat, useImageManipulator } from "expo-image-manipulator"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import * as Location from "expo-location"
 import * as FileSystem from "expo-file-system"
@@ -64,6 +64,9 @@ export default function Pago() {
     const [camaraCargando, setCamaraCargando] = useState(false)
     const [flashActivo, setFlashActivo] = useState(false)
     const [permisosCamara, solicitarPermisosCamara] = useCameraPermissions()
+    const [imagen, setImagen] = useState("")
+
+    const imageManipulator = useImageManipulator(imagen)
     const camaraRef = useRef(null)
 
     const esDetalleCredito = tieneContextoPago()
@@ -525,18 +528,14 @@ export default function Pago() {
                 base64: false
             })
 
-            setCamaraVisible(false)
-            setCamaraCargando(false)
-            setFlashActivo(false)
-
             // Comprimir y redimensionar
-            const manipulatedImage = await ImageManipulator.useImageManipulator(foto.uri)
-                .renderAsync()
-                .saveAsync({
-                    base64: false,
-                    compress: 0.8,
-                    format: ImageManipulator.SaveFormat.WEBP
-                })
+            setImagen(foto.uri)
+            const imageRender = await imageManipulator.renderAsync()
+            const manipulatedImage = await imageRender.saveAsync({
+                base64: false,
+                compress: 0.8,
+                format: SaveFormat.WEBP
+            })
 
             // Limpiar imagen original ya que tenemos la comprimida
             if (foto.uri !== manipulatedImage.uri) {
@@ -553,12 +552,15 @@ export default function Pago() {
                 { text: "OK", style: "default" }
             ])
         } catch (error) {
-            setCamaraVisible(false)
-            setCamaraCargando(false)
-            setFlashActivo(false)
+            console.error("Error al capturar foto:", error)
             showError("Error", "No se pudo capturar la foto. Inténtelo de nuevo.", [
                 { text: "OK", style: "default" }
             ])
+        } finally {
+            setCamaraVisible(false)
+            setCamaraCargando(false)
+            setFlashActivo(false)
+            setImagen("")
         }
     }
 
