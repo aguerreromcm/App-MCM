@@ -62,6 +62,7 @@ export default function Pago() {
     const [camaraVisible, setCamaraVisible] = useState(false)
     const [camaraLista, setCamaraLista] = useState(false)
     const [camaraCargando, setCamaraCargando] = useState(false)
+    const [flashActivo, setFlashActivo] = useState(false)
     const [permisosCamara, solicitarPermisosCamara] = useCameraPermissions()
     const camaraRef = useRef(null)
 
@@ -467,16 +468,13 @@ export default function Pago() {
     // Función para limpiar archivos temporales de fotos
     const limpiarFotoTemporal = async (uri) => {
         try {
-            // Solo intentar borrar si es un archivo temporal (no una URI de assets)
             if (uri && uri.startsWith("file://")) {
                 const fileInfo = await FileSystem.getInfoAsync(uri)
                 if (fileInfo.exists) {
                     await FileSystem.deleteAsync(uri, { idempotent: true })
-                    console.log("Foto temporal eliminada:", uri)
                 }
             }
         } catch (error) {
-            // No es crítico si falla, solo log
             console.log("No se pudo eliminar foto temporal:", error.message)
         }
     }
@@ -527,10 +525,10 @@ export default function Pago() {
 
             setCamaraVisible(false)
             setCamaraCargando(false)
+            setFlashActivo(false)
 
             // Comprimir y redimensionar
             const manipulatedImage = await ImageManipulator.manipulateAsync(foto.uri, [], {
-                compress: 0.8,
                 format: ImageManipulator.SaveFormat.WEBP
             })
 
@@ -551,7 +549,7 @@ export default function Pago() {
         } catch (error) {
             setCamaraVisible(false)
             setCamaraCargando(false)
-            console.error("Error al tomar foto:", error)
+            setFlashActivo(false)
             showError("Error", "No se pudo capturar la foto. Inténtelo de nuevo.", [
                 { text: "OK", style: "default" }
             ])
@@ -584,15 +582,6 @@ export default function Pago() {
                 longitud: location.coords.longitude
             }
         } catch (error) {
-            // Logging detallado del error para diagnóstico
-            console.error("=== ERROR DETALLADO DE UBICACIÓN ===")
-            console.error("Tipo de error:", error.name)
-            console.error("Mensaje:", error.message)
-            console.error("Código:", error.code)
-            console.error("Objeto completo:", JSON.stringify(error, null, 2))
-            console.error("=====================================")
-
-            // Determinar mensaje específico según el tipo de error
             let titulo = "Error de Ubicación"
             let mensaje = "No se pudo obtener la ubicación."
 
@@ -969,6 +958,7 @@ export default function Pago() {
                     onRequestClose={() => {
                         setCamaraVisible(false)
                         setCamaraLista(false)
+                        setFlashActivo(false)
                     }}
                 >
                     <View className="flex-1 bg-black">
@@ -976,10 +966,11 @@ export default function Pago() {
                             ref={camaraRef}
                             style={{ flex: 1 }}
                             facing="back"
+                            enableTorch={flashActivo}
+                            autofocus="on"
                             onCameraReady={() => {
                                 setTimeout(() => setCamaraLista(true), 1000)
                             }}
-                            autofocus="on"
                         />
 
                         {/* Controles superpuestos */}
@@ -990,6 +981,7 @@ export default function Pago() {
                                     onPress={() => {
                                         setCamaraVisible(false)
                                         setCamaraLista(false)
+                                        setFlashActivo(false)
                                     }}
                                     className="bg-white/20 rounded-full p-4"
                                 >
@@ -1007,8 +999,17 @@ export default function Pago() {
                                     <View className="bg-white rounded-full w-16 h-16" />
                                 </Pressable>
 
-                                {/* Espacio para simetría */}
-                                <View className="w-14" />
+                                {/* Toggle flash */}
+                                <Pressable
+                                    onPress={() => setFlashActivo((prev) => !prev)}
+                                    className={`rounded-full p-4 ${flashActivo ? "bg-yellow-400/90" : "bg-white/20"}`}
+                                >
+                                    <MaterialIcons
+                                        name={flashActivo ? "flash-on" : "flash-off"}
+                                        size={28}
+                                        color={flashActivo ? "#1a1a1a" : "white"}
+                                    />
+                                </Pressable>
                             </View>
 
                             {!camaraLista && (
