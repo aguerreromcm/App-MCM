@@ -522,21 +522,17 @@ export default function Pago() {
             // Capturar foto directamente desde la cámara in-app
             // skipProcessing: true para evitar procesamiento nativo pesado que causa crashes
             const foto = await camaraRef.current.takePictureAsync({
-                quality: 0.85,
                 exif: false
             })
-
-            console.log("Foto capturada:", foto)
 
             setCamaraVisible(false)
             setCamaraCargando(false)
 
             // Comprimir y redimensionar
-            const manipulatedImage = await ImageManipulator.manipulateAsync(
-                foto.uri,
-                [{ resize: { width: 1024 } }],
-                { compress: 0.75, format: ImageManipulator.SaveFormat.WEBP }
-            )
+            const manipulatedImage = await ImageManipulator.manipulateAsync(foto.uri, [], {
+                compress: 0.8,
+                format: ImageManipulator.SaveFormat.WEBP
+            })
 
             // Limpiar imagen original ya que tenemos la comprimida
             if (foto.uri !== manipulatedImage.uri) {
@@ -982,7 +978,7 @@ export default function Pago() {
                             facing="back"
                             onCameraReady={() => {
                                 // Retardo para que el sensor ajuste exposición y balance de blancos
-                                setTimeout(() => setCamaraLista(true), 1500)
+                                setTimeout(() => setCamaraLista(true), 1000)
                             }}
                         />
 
