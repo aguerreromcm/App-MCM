@@ -47,8 +47,6 @@ export const pagosPendientes = {
     async guardar(pagoData) {
         try {
             const pagosExistentes = await this.obtenerTodos()
-
-            // Verificar si ya existe un pago con el mismo ID único
             const pagoExistente = pagosExistentes.find((pago) => pago.id === pagoData.id)
             if (pagoExistente) {
                 console.log(`Pago con ID ${pagoData.id} ya existe, evitando duplicado`)
@@ -57,7 +55,7 @@ export const pagosPendientes = {
 
             const nuevoPago = {
                 ...pagoData,
-                id: pagoData.id || `${Date.now()}_${pagoData.credito}`, // Usar ID hasheado o fallback
+                id: pagoData.id || `${Date.now()}_${pagoData.credito}`,
                 estado: "pendiente"
             }
 

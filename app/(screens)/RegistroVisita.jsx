@@ -1,9 +1,11 @@
-import { useContext, useState, useEffect } from "react"
-import { View, Text, TextInput, Pressable, ScrollView, Image, Platform } from "react-native"
+import { useContext, useState, useEffect, useRef } from "react"
+import { View, Text, TextInput, Pressable, ScrollView, Image, Modal } from "react-native"
 import { Feather, MaterialIcons } from "@expo/vector-icons"
 import { router, useLocalSearchParams } from "expo-router"
-import * as ImagePicker from "expo-image-picker"
+import { CameraView, useCameraPermissions } from "expo-camera"
+import * as ImageManipulator from "expo-image-manipulator"
 import * as Location from "expo-location"
+import * as FileSystem from "expo-file-system"
 import { SafeAreaInsetsContext } from "react-native-safe-area-context"
 
 import { useCustomAlert } from "../../hooks/useCustomAlert"
@@ -16,10 +18,9 @@ export default function RegistroVisita() {
     const { alertRef, showError, showSuccess, showInfo, showWarning, showWait, hideWait } =
         useCustomAlert()
 
-    // Estado para controlar si los parámetros son válidos
     const [parametrosValidos, setParametrosValidos] = useState(false)
 
-    // Estados para los campos del formulario
+    // Campos del formulario
     const [credito, setCredito] = useState("")
     const [ciclo, setCiclo] = useState("")
     const [nombre, setNombre] = useState("")
@@ -27,10 +28,18 @@ export default function RegistroVisita() {
     const [fotoComprobante, setFotoComprobante] = useState(null)
     const [comentarios, setComentarios] = useState("")
 
-    // Estados para motivos de visita y la interfaz
+    // Motivos y UI
     const [motivosVisita, setMotivosVisita] = useState([])
     const [showMotivoSelect, setShowMotivoSelect] = useState(false)
     const [focusedField, setFocusedField] = useState("")
+
+    // Cámara in-app
+    const [camaraVisible, setCamaraVisible] = useState(false)
+    const [camaraLista, setCamaraLista] = useState(false)
+    const [camaraCargando, setCamaraCargando] = useState(false)
+    const [flashActivo, setFlashActivo] = useState(false)
+    const [permisosCamara, solicitarPermisosCamara] = useCameraPermissions()
+    const camaraRef = useRef(null)
 
     // Efecto para cargar datos desde los parámetros
     useEffect(() => {
@@ -63,7 +72,21 @@ export default function RegistroVisita() {
         cargarMotivosVisita()
     }, [])
 
-    const limpiarFormulario = () => {
+    const limpiarFotoTemporal = async (uri) => {
+        try {
+            if (uri && uri.startsWith("file://")) {
+                const fileInfo = await FileSystem.getInfoAsync(uri)
+                if (fileInfo.exists) {
+                    await FileSystem.deleteAsync(uri, { idempotent: true })
+                }
+            }
+        } catch (error) {
+            console.log("No se pudo eliminar foto temporal:", error.message)
+        }
+    }
+
+    const limpiarFormulario = async () => {
+        if (fotoComprobante?.uri) await limpiarFotoTemporal(fotoComprobante.uri)
         setMotivo("")
         setComentarios("")
         setFotoComprobante(null)
@@ -122,51 +145,66 @@ export default function RegistroVisita() {
                 style: "default",
                 onPress: async () => {
                     try {
-                        showWait("Registrando Visita", "Procesando la información...")
+                        const intentarConUbicacion = async () => {
+                            showWait("Obteniendo Ubicación", "Localizando GPS, por favor espere...")
+                            const ubicacion = await obtenerUbicacion()
 
-                        // Obtener ubicación GPS
-                        const ubicacion = await obtenerUbicacion()
-
-                        // Convertir imagen a base64
-                        const fotoBase64 = await convertirImagenABase64(fotoComprobante.uri)
-
-                        // Preparar datos para envío
-                        const datosVisita = {
-                            fecha: new Date().toISOString().split("T")[0], // Formato YYYY-MM-DD
-                            cdgns: credito,
-                            ciclo: ciclo,
-                            idmotivo: motivo,
-                            detalle: comentarios || "",
-                            latitud: ubicacion?.latitude || 0,
-                            longitud: ubicacion?.longitude || 0,
-                            foto: fotoBase64
-                        }
-
-                        // Enviar al servidor
-                        const resultado = await registrarVisita(datosVisita)
-
-                        hideWait()
-
-                        if (resultado.success) {
-                            showSuccess(
-                                "Éxito",
-                                resultado.mensaje || "Visita registrada correctamente",
-                                [
-                                    {
-                                        text: "OK",
-                                        onPress: () => {
-                                            router.back()
+                            if (!ubicacion) {
+                                hideWait()
+                                showWarning(
+                                    "Sin Ubicación",
+                                    "No se pudo obtener la ubicación GPS. Asegúrese de tener el GPS activo y señal suficiente, luego reintente.",
+                                    [
+                                        {
+                                            text: "Cancelar",
+                                            style: "cancel",
+                                            onPress: () => {}
+                                        },
+                                        {
+                                            text: "Reintentar",
+                                            style: "default",
+                                            onPress: async () => await intentarConUbicacion()
                                         }
-                                    }
-                                ]
-                            )
-                        } else {
-                            showError(
-                                "Error",
-                                resultado.error || "No se pudo registrar la visita",
-                                [{ text: "OK", style: "default" }]
-                            )
+                                    ]
+                                )
+                                return
+                            }
+
+                            showWait("Registrando Visita", "Procesando la información...")
+
+                            const fotoBase64 = await convertirImagenABase64(fotoComprobante.uri)
+
+                            const datosVisita = {
+                                fecha: new Date().toISOString().split("T")[0],
+                                cdgns: credito,
+                                ciclo: ciclo,
+                                idmotivo: motivo,
+                                detalle: comentarios || "",
+                                latitud: ubicacion.latitud,
+                                longitud: ubicacion.longitud,
+                                foto: fotoBase64
+                            }
+
+                            const resultado = await registrarVisita(datosVisita)
+
+                            hideWait()
+
+                            if (resultado.success) {
+                                showSuccess(
+                                    "Éxito",
+                                    resultado.mensaje || "Visita registrada correctamente",
+                                    [{ text: "OK", onPress: () => router.back() }]
+                                )
+                            } else {
+                                showError(
+                                    "Error",
+                                    resultado.error || "No se pudo registrar la visita",
+                                    [{ text: "OK", style: "default" }]
+                                )
+                            }
                         }
+
+                        await intentarConUbicacion()
                     } catch (error) {
                         hideWait()
                         console.error("Error al procesar visita:", error)
@@ -181,24 +219,69 @@ export default function RegistroVisita() {
 
     const capturarFoto = async () => {
         try {
-            const permisosCamara = await ImagePicker.requestCameraPermissionsAsync()
-            if (permisosCamara.status !== "granted") {
-                showError("Permisos", "Se necesitan permisos de cámara para capturar la foto", [
-                    { text: "OK", style: "default" }
-                ])
-                return
+            if (!permisosCamara?.granted) {
+                const resultado = await solicitarPermisosCamara()
+                if (!resultado.granted) {
+                    showError(
+                        "Permisos Requeridos",
+                        "Se necesitan permisos de cámara para capturar el comprobante",
+                        [{ text: "OK", style: "default" }]
+                    )
+                    return
+                }
             }
 
-            const resultado = await ImagePicker.launchCameraAsync({
-                mediaTypes: ["images"]
+            if (fotoComprobante?.uri) {
+                await limpiarFotoTemporal(fotoComprobante.uri)
+                setFotoComprobante(null)
+            }
+
+            setCamaraLista(false)
+            setCamaraVisible(true)
+        } catch (error) {
+            console.error("Error al abrir cámara:", error)
+            showError("Error", "No se pudo abrir la cámara. Inténtelo de nuevo.", [
+                { text: "OK", style: "default" }
+            ])
+        }
+    }
+
+    const tomarFoto = async () => {
+        if (!camaraRef.current || !camaraLista || camaraCargando) return
+
+        try {
+            setCamaraCargando(true)
+
+            const foto = await camaraRef.current.takePictureAsync({
+                exif: false,
+                base64: false
             })
 
-            if (!resultado.canceled && resultado.assets && resultado.assets.length > 0) {
-                setFotoComprobante(resultado.assets[0])
-            }
+            const manipulatedImage = await ImageManipulator.manipulateAsync(foto.uri, [], {
+                format: ImageManipulator.SaveFormat.WEBP,
+                compress: 0.8,
+                base64: false
+            })
+
+            if (foto.uri !== manipulatedImage.uri) await limpiarFotoTemporal(foto.uri)
+
+            setFotoComprobante({
+                uri: manipulatedImage.uri,
+                width: manipulatedImage.width,
+                height: manipulatedImage.height
+            })
+
+            showSuccess("¡Foto Capturada!", "El comprobante ha sido capturado correctamente", [
+                { text: "OK", style: "default" }
+            ])
         } catch (error) {
-            console.error("Error al capturar foto:", error)
-            showError("Error", "No se pudo capturar la foto", [{ text: "OK", style: "default" }])
+            showError("Error", "No se pudo capturar la foto. Inténtelo de nuevo.", [
+                { text: "OK", style: "default" }
+            ])
+        } finally {
+            setCamaraVisible(false)
+            setCamaraCargando(false)
+            setFlashActivo(false)
         }
     }
 
@@ -206,38 +289,61 @@ export default function RegistroVisita() {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync()
             if (status !== "granted") {
-                console.warn("Permisos de ubicación no concedidos")
+                showError(
+                    "Permisos Requeridos",
+                    "Se necesitan permisos de ubicación para registrar la visita",
+                    [{ text: "OK", style: "default" }]
+                )
                 return null
             }
 
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
-                timeout: 10000
+                timeout: 10000,
+                maximumAge: 120000
             })
 
             return {
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude
+                latitud: location.coords.latitude,
+                longitud: location.coords.longitude
             }
         } catch (error) {
-            console.error("Error al obtener ubicación:", error)
+            let titulo = "Error de Ubicación"
+            let mensaje = "No se pudo obtener la ubicación."
+
+            if (error.message?.includes("timeout") || error.code === "E_TIMEOUT") {
+                titulo = "Tiempo de espera agotado"
+                mensaje =
+                    "No se pudo obtener la ubicación en el tiempo esperado. Verifique que el GPS esté activado."
+            } else if (
+                error.message?.includes("Location provider is unavailable") ||
+                error.code === "E_LOCATION_UNAVAILABLE"
+            ) {
+                titulo = "GPS No Disponible"
+                mensaje =
+                    "El servicio de ubicación no está disponible. Active el GPS en la configuración de su dispositivo."
+            } else if (error.message?.includes("network") || error.message?.includes("Network")) {
+                titulo = "Sin Señal"
+                mensaje =
+                    "No se pudo obtener la ubicación por falta de señal. Intente moverse a un área con mejor cobertura."
+            } else if (error.code === "E_LOCATION_SERVICES_DISABLED") {
+                titulo = "Servicios de Ubicación Desactivados"
+                mensaje = "Active los servicios de ubicación en la configuración de su dispositivo."
+            }
+
+            mensaje += `\n\nError técnico: ${error.message || "Desconocido"}`
+
+            showError(titulo, mensaje, [{ text: "OK", style: "default" }])
             return null
         }
     }
 
     const convertirImagenABase64 = async (uri) => {
         try {
-            const response = await fetch(uri)
-            const blob = await response.blob()
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader()
-                reader.onload = () => {
-                    const base64 = reader.result.split(",")[1] // Remover el prefijo data:image...
-                    resolve(base64)
-                }
-                reader.onerror = reject
-                reader.readAsDataURL(blob)
+            const base64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64
             })
+            return base64
         } catch (error) {
             console.error("Error al convertir imagen:", error)
             return ""
@@ -493,6 +599,91 @@ export default function RegistroVisita() {
                 </View>
             </View>
             <CustomAlert ref={alertRef} />
+
+            {/* Modal de cámara in-app */}
+            {camaraVisible && (
+                <Modal
+                    visible={camaraVisible}
+                    animationType="slide"
+                    onRequestClose={() => {
+                        setCamaraVisible(false)
+                        setCamaraLista(false)
+                        setFlashActivo(false)
+                    }}
+                >
+                    <View className="flex-1 bg-black">
+                        <CameraView
+                            ref={camaraRef}
+                            style={{ flex: 1 }}
+                            facing="back"
+                            enableTorch={flashActivo}
+                            autofocus="on"
+                            onCameraReady={() => {
+                                setTimeout(() => setCamaraLista(true), 1000)
+                            }}
+                        />
+
+                        {/* Controles superpuestos */}
+                        <View className="absolute bottom-0 left-0 right-0 pb-10 pt-6 bg-black/50">
+                            {camaraCargando && (
+                                <Text className="text-white text-center mt-3 text-sm">
+                                    Procesando foto...
+                                </Text>
+                            )}
+                            <View className="flex-row justify-around items-center px-8">
+                                {/* Cancelar */}
+                                <Pressable
+                                    onPress={() => {
+                                        setCamaraVisible(false)
+                                        setCamaraLista(false)
+                                        setFlashActivo(false)
+                                    }}
+                                    className="bg-white/20 rounded-full p-4"
+                                >
+                                    <MaterialIcons name="close" size={28} color="white" />
+                                </Pressable>
+
+                                {/* Botón captura */}
+                                <Pressable
+                                    onPress={tomarFoto}
+                                    disabled={!camaraLista || camaraCargando}
+                                    className={`rounded-full p-1 border-4 border-white ${
+                                        camaraCargando ? "opacity-50" : ""
+                                    }`}
+                                >
+                                    <View className="bg-white rounded-full w-16 h-16" />
+                                </Pressable>
+
+                                {/* Toggle flash */}
+                                <Pressable
+                                    onPress={() => setFlashActivo((prev) => !prev)}
+                                    className={`rounded-full p-4 ${flashActivo ? "bg-yellow-400/90" : "bg-white/20"}`}
+                                >
+                                    <MaterialIcons
+                                        name={flashActivo ? "flash-on" : "flash-off"}
+                                        size={28}
+                                        color={flashActivo ? "#1a1a1a" : "white"}
+                                    />
+                                </Pressable>
+                            </View>
+                        </View>
+
+                        {/* Guía visual */}
+                        <View className="absolute top-12 left-0 right-0 items-center">
+                            {!camaraLista && (
+                                <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
+                                    Iniciando cámara...
+                                </Text>
+                            )}
+                            {camaraLista && (
+                                <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
+                                    Enfoca el comprobante y presiona el botón central
+                                </Text>
+                            )}
+                        </View>
+                    </View>
+                </Modal>
+            )}
         </View>
     )
 }

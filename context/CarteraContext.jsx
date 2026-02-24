@@ -1,5 +1,13 @@
 import { createContext, useContext, useState, useEffect } from "react"
 import { catalogos } from "../services"
+import storage from "../utils/storage"
+
+const STORAGE_KEYS = {
+    clientes: "cartera_clientes",
+    detalleOperaciones: "cartera_detalle_operaciones",
+    resumenDiario: "cartera_resumen_diario",
+    lastUpdate: "cartera_last_update"
+}
 
 const CarteraContext = createContext()
 
@@ -45,6 +53,14 @@ export const CarteraProvider = ({ children }) => {
             setDetalleOperaciones(operaciones)
             setResumenDiario(resumen)
             setLastUpdate(ahora)
+
+            // Persistir en almacenamiento local para sobrevivir reinicios
+            await Promise.all([
+                storage.setItem(STORAGE_KEYS.clientes, nuevosClientes),
+                storage.setItem(STORAGE_KEYS.detalleOperaciones, operaciones),
+                storage.setItem(STORAGE_KEYS.resumenDiario, resumen),
+                storage.setItem(STORAGE_KEYS.lastUpdate, ahora)
+            ])
 
             return { success: true, data: nuevosClientes }
         } catch (error) {
@@ -92,17 +108,51 @@ export const CarteraProvider = ({ children }) => {
         return resumenDiario ? { ...resumenDiario } : null
     }
 
-    // Función para limpiar la caché
-    const limpiarCache = () => {
+    // Función para limpiar la caché (memoria y almacenamiento local)
+    const limpiarCache = async () => {
         setClientes([])
         setDetalleOperaciones([])
         setResumenDiario(null)
         setLastUpdate(null)
+        await Promise.all([
+            storage.setItem(STORAGE_KEYS.clientes, []),
+            storage.setItem(STORAGE_KEYS.detalleOperaciones, []),
+            storage.setItem(STORAGE_KEYS.resumenDiario, null),
+            storage.setItem(STORAGE_KEYS.lastUpdate, null)
+        ])
     }
 
-    // Cargar datos iniciales al montar el provider
+    // Cargar datos persistidos desde almacenamiento local al montar el provider
     useEffect(() => {
-        obtenerCartera()
+        const cargarDesdeStorage = async () => {
+            try {
+                const [
+                    clientesGuardados,
+                    operacionesGuardadas,
+                    resumenGuardado,
+                    lastUpdateGuardado
+                ] = await Promise.all([
+                    storage.getItem(STORAGE_KEYS.clientes),
+                    storage.getItem(STORAGE_KEYS.detalleOperaciones),
+                    storage.getItem(STORAGE_KEYS.resumenDiario),
+                    storage.getItem(STORAGE_KEYS.lastUpdate)
+                ])
+
+                if (clientesGuardados && clientesGuardados.length > 0) {
+                    setClientes(clientesGuardados)
+                    setDetalleOperaciones(operacionesGuardadas || [])
+                    setResumenDiario(resumenGuardado || null)
+                    setLastUpdate(lastUpdateGuardado || null)
+                }
+            } catch (error) {
+                console.error("Error al cargar cartera desde storage:", error)
+            } finally {
+                // Después de restaurar el estado local, verificar si hay actualización pendiente
+                obtenerCartera()
+            }
+        }
+
+        cargarDesdeStorage()
     }, [])
 
     const value = {

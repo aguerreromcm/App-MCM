@@ -25,7 +25,6 @@ import * as Location from "expo-location"
 import * as FileSystem from "expo-file-system"
 import { generarIdPago } from "../../utils/pagoId"
 import storage from "../../utils/storage"
-import { fy } from "date-fns/locale"
 
 export default function Pago() {
     const params = useLocalSearchParams()
@@ -34,55 +33,37 @@ export default function Pago() {
     const { alertRef, showError, showSuccess, showInfo, showWarning, showWait, hideWait } =
         useCustomAlert()
     const { validarCredito } = useCartera()
-
-    // Estado para controlar si los parámetros son válidos (vienen con timestamp reciente)
-    const [parametrosValidos, setParametrosValidos] = useState(false)
-
-    // Estados para los campos del formulario
     const [credito, setCredito] = useState("")
     const [ciclo, setCiclo] = useState("")
     const [monto, setMonto] = useState("")
     const [tipoPago, setTipoPago] = useState("")
     const [fotoComprobante, setFotoComprobante] = useState(null)
     const [comentarios, setComentarios] = useState("")
-
-    // Estados para validación de crédito
     const [creditoValido, setCreditoValido] = useState(null)
     const [infoCredito, setInfoCredito] = useState(null)
-
-    // Estados para tipos de pago y la interfaz
     const [tiposPago, setTiposPago] = useState([])
     const [showTipoSelect, setShowTipoSelect] = useState(false)
     const [montoFormateado, setMontoFormateado] = useState("")
     const [focusedField, setFocusedField] = useState("")
-
-    const scaleAnim = useState(new Animated.Value(1))[0]
-    const shakeAnim = useState(new Animated.Value(0))[0]
-
-    // Estados y ref para la cámara in-app
     const [camaraVisible, setCamaraVisible] = useState(false)
     const [camaraLista, setCamaraLista] = useState(false)
     const [camaraCargando, setCamaraCargando] = useState(false)
     const [flashActivo, setFlashActivo] = useState(false)
     const [permisosCamara, solicitarPermisosCamara] = useCameraPermissions()
     const camaraRef = useRef(null)
-
+    const scaleAnim = useState(new Animated.Value(1))[0]
+    const shakeAnim = useState(new Animated.Value(0))[0]
     const esDetalleCredito = tieneContextoPago()
 
-    // Efecto para cargar datos desde el contexto
     useEffect(() => {
         if (esDetalleCredito && datosPago) {
-            setParametrosValidos(true)
             setCredito(datosPago.noCreditoDetalle)
             setCiclo(datosPago.cicloDetalle)
             setMonto(datosPago.pagoSemanalDetalle?.toString() || "")
-            setTipoPago(datosPago.pagoSemanalDetalle ? "P" : "") // P es el código por defecto para PAGO
-        } else {
-            setParametrosValidos(false)
+            setTipoPago(datosPago.pagoSemanalDetalle ? "P" : "")
         }
     }, [esDetalleCredito, datosPago])
 
-    // Efecto para validar el número de crédito cuando cambia
     useEffect(() => {
         if (credito.length === 6) {
             const resultado = validarCredito(credito)
@@ -98,7 +79,7 @@ export default function Pago() {
                 // Auto-llenar el monto con pago_semanal si no viene de DetalleCredito
                 if (!esDetalleCredito && resultado.cliente.pago_semanal) {
                     setMonto(resultado.cliente.pago_semanal.toString())
-                    setTipoPago("P") // Establecer como PAGO por defecto
+                    setTipoPago("P")
                 }
             } else {
                 setInfoCredito(null)
@@ -113,7 +94,6 @@ export default function Pago() {
         }
     }, [credito, validarCredito, esDetalleCredito])
 
-    // Cargar tipos de pago desde catálogos
     useEffect(() => {
         const cargarTiposPago = async () => {
             try {
@@ -154,13 +134,9 @@ export default function Pago() {
         ]).start()
     }
 
-    const limpiarFormulario = async () => {
-        // Limpiar archivo temporal de foto si existe
-        if (fotoComprobante?.uri) {
-            await limpiarFotoTemporal(fotoComprobante.uri)
-        }
+    const limpiarFormulario = async (conservarFoto = false) => {
+        if (!conservarFoto && fotoComprobante?.uri) limpiarFotoTemporal(fotoComprobante.uri)
 
-        // Siempre limpiar todos los campos
         setCredito("")
         setCiclo("")
         setMonto("")
@@ -169,11 +145,8 @@ export default function Pago() {
         setFotoComprobante(null)
         setMontoFormateado("")
         setFocusedField("")
-        setParametrosValidos(false)
         setCreditoValido(null)
         setInfoCredito(null)
-
-        // Limpiar contexto de pago
         limpiarDatosPago()
     }
 
@@ -291,57 +264,45 @@ export default function Pago() {
                   )}\n`
                 : "Confirmar Registro"
         const confirmacionMensaje = `¿Confirma que desea registrar un ${tipoSeleccionado?.descripcion.toLowerCase()} de ${montoFormateado} para el crédito ${credito}?`
-        // Prueba cambio repositorio
-        // Mostrar confirmación antes de procesar
+
         alerta(titulo, confirmacionMensaje, [
             {
                 text: "Cancelar",
                 style: "cancel",
-                onPress: () => {
-                    // No hacer nada, solo cerrar el modal
-                }
+                onPress: () => {}
             },
             {
                 text: "Confirmar",
                 style: "default",
                 onPress: async () => {
                     try {
-                        // Mostrar modal de espera al inicio del proceso
-                        showWait("Procesando Pago", "Registrando el pago, por favor espere...")
-
-                        // Obtener ubicación antes de guardar el pago
-                        const ubicacion = await obtenerUbicacion()
-                        if (!ubicacion) {
-                            // Si no se pudo obtener la ubicación, preguntar si desea continuar
-                            hideWait()
-                            showWarning(
-                                "Sin Ubicación",
-                                "No se pudo obtener la ubicación GPS. ¿Desea registrar el pago sin ubicación? (Solo use esta opción en zonas sin señal)",
-                                [
-                                    {
-                                        text: "Cancelar",
-                                        style: "cancel",
-                                        onPress: () => {
-                                            // No hacer nada, volver al formulario
+                        const intentar = async () => {
+                            showWait("Obteniendo Ubicación", "Localizando GPS, por favor espere...")
+                            const ubicacion = await obtenerUbicacion()
+                            if (!ubicacion) {
+                                hideWait()
+                                showWarning(
+                                    "Sin Ubicación",
+                                    "No se pudo obtener la ubicación GPS. Asegúrese de tener el GPS activo y señal suficiente, luego reintente.",
+                                    [
+                                        {
+                                            text: "Cancelar",
+                                            style: "cancel",
+                                            onPress: () => {}
+                                        },
+                                        {
+                                            text: "Reintentar",
+                                            style: "default",
+                                            onPress: async () => await intentar()
                                         }
-                                    },
-                                    {
-                                        text: "Continuar sin GPS",
-                                        style: "default",
-                                        onPress: async () => {
-                                            // Continuar con ubicación por defecto
-                                            await guardarPagoConUbicacion({
-                                                latitud: 0,
-                                                longitud: 0
-                                            })
-                                        }
-                                    }
-                                ]
-                            )
-                            return
+                                    ]
+                                )
+                                return
+                            }
+                            await guardarPago(ubicacion)
                         }
 
-                        await guardarPagoConUbicacion(ubicacion)
+                        await intentar()
                     } catch (error) {
                         console.error("Error al procesar pago:", error)
                         hideWait()
@@ -354,31 +315,26 @@ export default function Pago() {
         ])
     }
 
-    // Función auxiliar para guardar el pago con ubicación
-    const guardarPagoConUbicacion = async (ubicacion) => {
+    const guardarPago = async (ubicacion) => {
         try {
             showWait("Procesando Pago", "Registrando el pago, por favor espere...")
 
-            // Obtener información del usuario actual
+            // Obtener información del pago a registrar
             const usuario = await storage.getUser()
             const usuarioId = usuario?.id_usuario || "UNKNOWN"
-
-            // Generar ID único para el pago
             const fechaCaptura = new Date()
             const idPago = await generarIdPago(credito, fechaCaptura, usuarioId, monto)
-
-            // Obtener el tipo seleccionado para la etiqueta
             const tipoSeleccionado = tiposPago.find((t) => t.codigo === tipoPago)
 
-            // Preparar los datos del pago
+            // Preparar los datos para el envío o almacenamiento local
             const pagoData = {
                 id: idPago,
                 credito,
                 ciclo,
                 monto,
                 comentarios,
-                tipoPago: tipoPago, // código del tipo
-                tipoEtiqueta: tipoSeleccionado?.descripcion || tipoPago, // etiqueta para mostrar
+                tipoPago: tipoPago,
+                tipoEtiqueta: tipoSeleccionado?.descripcion || tipoPago,
                 nombreCliente: infoCredito?.nombre || params.nombre || "",
                 fotoComprobante: fotoComprobante?.uri || null,
                 latitud: ubicacion.latitud,
@@ -396,22 +352,14 @@ export default function Pago() {
                     hideWait()
                     const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} registrado exitosamente en el servidor`
 
-                    // Limpiar foto temporal después de envío exitoso
-                    if (fotoComprobante?.uri) {
-                        await limpiarFotoTemporal(fotoComprobante.uri)
-                    }
-
                     showSuccess("¡Pago Registrado!", mensaje, [
                         {
                             text: "OK",
                             style: "default",
                             onPress: () => {
                                 limpiarFormulario()
-                                if (esDetalleCredito) {
-                                    router.push("/(screens)/DetalleCredito")
-                                } else {
-                                    router.replace("/(tabs)/Cartera")
-                                }
+                                if (esDetalleCredito) router.push("/(screens)/DetalleCredito")
+                                else router.replace("/(tabs)/Cartera")
                             }
                         }
                     ])
@@ -421,23 +369,18 @@ export default function Pago() {
                 console.log("Error al enviar al servidor, guardando localmente:", error)
             }
 
-            // Si llegamos aquí, no se pudo enviar al servidor
-            // Guardar en storage local como pendiente
             const resultado = await pagosPendientes.guardar(pagoData)
 
             if (resultado.success) {
                 hideWait()
                 const mensaje = `${tipoSeleccionado?.descripcion} de ${montoFormateado} guardado localmente, debe realizar la sincronización manual después.`
 
-                // NO limpiar foto temporal aquí porque se guardó localmente y se necesita para sincronizar
-                // La limpieza se hará cuando se sincronice o se descarte el pago
-
                 showInfo("Pago Guardado Localmente", mensaje, [
                     {
                         text: "OK",
                         style: "default",
                         onPress: () => {
-                            limpiarFormulario()
+                            limpiarFormulario(true)
                             if (esDetalleCredito) {
                                 router.push("/(screens)/DetalleCredito")
                             } else {
@@ -453,7 +396,7 @@ export default function Pago() {
                 ])
             }
         } catch (error) {
-            console.error("Error en guardarPagoConUbicacion:", error)
+            console.error("Error en guardarPago:", error)
             hideWait()
             showError("Error", "Ocurrió un error inesperado al guardar el pago.", [
                 { text: "OK", style: "default" }
@@ -466,7 +409,6 @@ export default function Pago() {
         return numero
     }
 
-    // Función para limpiar archivos temporales de fotos
     const limpiarFotoTemporal = async (uri) => {
         try {
             if (uri && uri.startsWith("file://")) {
@@ -482,7 +424,6 @@ export default function Pago() {
 
     const capturarFoto = async () => {
         try {
-            // Verificar/solicitar permisos
             if (!permisosCamara?.granted) {
                 const resultado = await solicitarPermisosCamara()
                 if (!resultado.granted) {
@@ -495,13 +436,11 @@ export default function Pago() {
                 }
             }
 
-            // Limpiar foto anterior de memoria antes de abrir cámara
             if (fotoComprobante?.uri) {
                 await limpiarFotoTemporal(fotoComprobante.uri)
                 setFotoComprobante(null)
             }
 
-            // Abrir la cámara in-app (no lanza actividad externa)
             setCamaraLista(false)
             setCamaraVisible(true)
         } catch (error) {
@@ -518,14 +457,11 @@ export default function Pago() {
         try {
             setCamaraCargando(true)
 
-            // Capturar foto directamente desde la cámara in-app
-            // skipProcessing: true para evitar procesamiento nativo pesado que causa crashes
             const foto = await camaraRef.current.takePictureAsync({
                 exif: false,
                 base64: false
             })
 
-            // Comprimir y redimensionar
             const manipulatedImage = await ImageManipulator.manipulateAsync(foto.uri, [], {
                 format: ImageManipulator.SaveFormat.WEBP,
                 compress: 0.8,
@@ -571,7 +507,7 @@ export default function Pago() {
             // Obtener ubicación actual con configuración más flexible
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced, // Cambio de High a Balanced para mejor compatibilidad
-                timeout: 15000, // Aumentado a 15 segundos
+                timeout: 10000, // Aumentado a 15 segundos
                 maximumAge: 120000 // Permitir ubicación de hasta 2 minutos de antigüedad
             })
 
@@ -973,6 +909,11 @@ export default function Pago() {
 
                         {/* Controles superpuestos */}
                         <View className="absolute bottom-0 left-0 right-0 pb-10 pt-6 bg-black/50">
+                            {camaraCargando && (
+                                <Text className="text-white text-center mt-3 text-sm">
+                                    Procesando foto...
+                                </Text>
+                            )}
                             <View className="flex-row justify-around items-center px-8">
                                 {/* Cancelar */}
                                 <Pressable
@@ -1009,24 +950,20 @@ export default function Pago() {
                                     />
                                 </Pressable>
                             </View>
-
-                            {!camaraLista && (
-                                <Text className="text-white text-center mt-3 text-sm opacity-70">
-                                    Iniciando cámara...
-                                </Text>
-                            )}
-                            {camaraCargando && (
-                                <Text className="text-white text-center mt-3 text-sm">
-                                    Procesando foto...
-                                </Text>
-                            )}
                         </View>
 
                         {/* Guía visual */}
                         <View className="absolute top-12 left-0 right-0 items-center">
-                            <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
-                                Enfoca el comprobante y presiona el botón
-                            </Text>
+                            {!camaraLista && (
+                                <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
+                                    Iniciando cámara...
+                                </Text>
+                            )}
+                            {camaraLista && (
+                                <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
+                                    Enfoca el comprobante y presiona el botón central
+                                </Text>
+                            )}
                         </View>
                     </View>
                 </Modal>

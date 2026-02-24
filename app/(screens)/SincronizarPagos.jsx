@@ -11,7 +11,6 @@ import {
 } from "react-native"
 import { router } from "expo-router"
 import { Feather, MaterialIcons } from "@expo/vector-icons"
-import { COLORS } from "../../constants"
 import { SafeAreaInsetsContext } from "react-native-safe-area-context"
 import { pagosPendientes, registroPagos } from "../../services"
 import { useCustomAlert } from "../../hooks/useCustomAlert"
