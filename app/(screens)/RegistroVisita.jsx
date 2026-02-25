@@ -38,6 +38,7 @@ export default function RegistroVisita() {
     const [camaraLista, setCamaraLista] = useState(false)
     const [camaraCargando, setCamaraCargando] = useState(false)
     const [flashActivo, setFlashActivo] = useState(false)
+    const [camaraFrente, setCamaraFrente] = useState(false)
     const [permisosCamara, solicitarPermisosCamara] = useCameraPermissions()
     const camaraRef = useRef(null)
 
@@ -622,13 +623,14 @@ export default function RegistroVisita() {
                         setCamaraVisible(false)
                         setCamaraLista(false)
                         setFlashActivo(false)
+                        setCamaraFrente(false)
                     }}
                 >
                     <View className="flex-1 bg-black">
                         <CameraView
                             ref={camaraRef}
                             style={{ flex: 1 }}
-                            facing="back"
+                            facing={camaraFrente ? "front" : "back"}
                             enableTorch={flashActivo}
                             autofocus="on"
                             onCameraReady={() => {
@@ -650,6 +652,7 @@ export default function RegistroVisita() {
                                         setCamaraVisible(false)
                                         setCamaraLista(false)
                                         setFlashActivo(false)
+                                        setCamaraFrente(false)
                                     }}
                                     className="bg-white/20 rounded-full p-4"
                                 >
@@ -678,22 +681,32 @@ export default function RegistroVisita() {
                                         color={flashActivo ? "#1a1a1a" : "white"}
                                     />
                                 </Pressable>
+
+                                {/* Toggle cámara */}
+                                <Pressable
+                                    onPress={() => {
+                                        setCamaraLista(false)
+                                        setCamaraFrente((prev) => !prev)
+                                    }}
+                                    className="bg-white/20 rounded-full p-4"
+                                >
+                                    <MaterialIcons
+                                        name="flip-camera-android"
+                                        size={28}
+                                        color="white"
+                                    />
+                                </Pressable>
                             </View>
                         </View>
 
                         {/* Guía visual */}
-                        <View className="absolute top-12 left-0 right-0 items-center">
-                            {!camaraLista && (
+                        {!camaraLista && (
+                            <View className="absolute top-12 left-0 right-0 items-center">
                                 <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
                                     Iniciando cámara...
                                 </Text>
-                            )}
-                            {camaraLista && (
-                                <Text className="text-white text-sm bg-black/40 px-4 py-2 rounded-full">
-                                    Enfoca el comprobante y presiona el botón central
-                                </Text>
-                            )}
-                        </View>
+                            </View>
+                        )}
                     </View>
                 </Modal>
             )}
