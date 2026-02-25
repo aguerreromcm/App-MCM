@@ -276,36 +276,61 @@ export default function Pago() {
                 style: "default",
                 onPress: async () => {
                     try {
-                        const intentar = async () => {
-                            showWait("Obteniendo Ubicación", "Localizando GPS, por favor espere...")
-                            const ubicacion = await obtenerUbicacion()
-                            if (!ubicacion) {
-                                hideWait()
-                                showWarning(
-                                    "Sin Ubicación",
-                                    "No se pudo obtener la ubicación GPS. Asegúrese de tener el GPS activo y señal suficiente, luego reintente.",
-                                    [
-                                        {
-                                            text: "Cancelar",
-                                            style: "cancel",
-                                            onPress: () => {}
-                                        },
-                                        {
-                                            text: "Reintentar",
-                                            style: "default",
-                                            onPress: async () => await intentar()
+                        const ubicacion = await obtenerUbicacion()
+                        if (!ubicacion) {
+                            showWarning(
+                                "Sin Ubicación",
+                                "No se pudo obtener la ubicación GPS. ¿Desea registrar el pago sin ubicación? (Solo use esta opción en zonas sin señal)",
+                                [
+                                    {
+                                        text: "Cancelar",
+                                        style: "cancel",
+                                        onPress: () => {}
+                                    },
+                                    {
+                                        text: "Continuar sin GPS",
+                                        style: "default",
+                                        onPress: async () => {
+                                            await guardarPago({
+                                                latitud: 0,
+                                                longitud: 0
+                                            })
                                         }
-                                    ]
-                                )
-                                return
-                            }
-                            await guardarPago(ubicacion)
+                                    }
+                                ]
+                            )
+                            return
                         }
 
-                        await intentar()
+                        await guardarPago(ubicacion)
+
+                        // const intentar = async () => {
+                        //     const ubicacion = await obtenerUbicacion()
+                        //     if (!ubicacion) {
+                        //         showWarning(
+                        //             "Sin Ubicación",
+                        //             "No se pudo obtener la ubicación GPS. Asegúrese de tener el GPS activo y señal suficiente, luego reintente.",
+                        //             [
+                        //                 {
+                        //                     text: "Cancelar",
+                        //                     style: "cancel",
+                        //                     onPress: () => {}
+                        //                 },
+                        //                 {
+                        //                     text: "Reintentar",
+                        //                     style: "default",
+                        //                     onPress: async () => await intentar()
+                        //                 }
+                        //             ]
+                        //         )
+                        //         return
+                        //     }
+                        //     await guardarPago(ubicacion)
+                        // }
+
+                        // await intentar()
                     } catch (error) {
                         console.error("Error al procesar pago:", error)
-                        hideWait()
                         showError("Error", "Ocurrió un error inesperado al procesar el pago.", [
                             { text: "OK", style: "default" }
                         ])
@@ -492,10 +517,12 @@ export default function Pago() {
 
     const obtenerUbicacion = async () => {
         try {
-            // Solicitar permisos de ubicación
+            showWait("Obteniendo Ubicación", "Localizando GPS, por favor espere...")
+
             const { status } = await Location.requestForegroundPermissionsAsync()
 
             if (status !== "granted") {
+                hideWait()
                 showError(
                     "Permisos Requeridos",
                     "Se necesitan permisos de ubicación para registrar el pago",
@@ -504,18 +531,19 @@ export default function Pago() {
                 return null
             }
 
-            // Obtener ubicación actual con configuración más flexible
             const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced, // Cambio de High a Balanced para mejor compatibilidad
-                timeout: 10000, // Aumentado a 15 segundos
-                maximumAge: 120000 // Permitir ubicación de hasta 2 minutos de antigüedad
+                accuracy: Location.Accuracy.Balanced,
+                timeout: 20000,
+                maximumAge: 120000
             })
 
+            hideWait()
             return {
                 latitud: location.coords.latitude,
                 longitud: location.coords.longitude
             }
         } catch (error) {
+            hideWait()
             let titulo = "Error de Ubicación"
             let mensaje = "No se pudo obtener la ubicación."
 

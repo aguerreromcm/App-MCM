@@ -145,12 +145,10 @@ export default function RegistroVisita() {
                 style: "default",
                 onPress: async () => {
                     try {
-                        const intentarConUbicacion = async () => {
-                            showWait("Obteniendo Ubicación", "Localizando GPS, por favor espere...")
-                            const ubicacion = await obtenerUbicacion()
+                        const intentar = async () => {
+                            let ubicacion = await obtenerUbicacion()
 
                             if (!ubicacion) {
-                                hideWait()
                                 showWarning(
                                     "Sin Ubicación",
                                     "No se pudo obtener la ubicación GPS. Asegúrese de tener el GPS activo y señal suficiente, luego reintente.",
@@ -161,13 +159,24 @@ export default function RegistroVisita() {
                                             onPress: () => {}
                                         },
                                         {
-                                            text: "Reintentar",
+                                            text: "Continuar sin GPS",
                                             style: "default",
-                                            onPress: async () => await intentarConUbicacion()
+                                            onPress: async () => {
+                                                ubicacion = {
+                                                    latitud: 0,
+                                                    longitud: 0
+                                                }
+                                            }
                                         }
+                                        // {
+                                        //     text: "Reintentar",
+                                        //     style: "default",
+                                        //     onPress: async () => await intentar()
+                                        // }
                                     ]
                                 )
-                                return
+                                if (!ubicacion) return
+                                // return
                             }
 
                             showWait("Registrando Visita", "Procesando la información...")
@@ -204,7 +213,7 @@ export default function RegistroVisita() {
                             }
                         }
 
-                        await intentarConUbicacion()
+                        await intentar()
                     } catch (error) {
                         hideWait()
                         console.error("Error al procesar visita:", error)
@@ -287,8 +296,11 @@ export default function RegistroVisita() {
 
     const obtenerUbicacion = async () => {
         try {
+            showWait("Obteniendo Ubicación", "Localizando GPS, por favor espere...")
+
             const { status } = await Location.requestForegroundPermissionsAsync()
             if (status !== "granted") {
+                hideWait()
                 showError(
                     "Permisos Requeridos",
                     "Se necesitan permisos de ubicación para registrar la visita",
@@ -299,10 +311,11 @@ export default function RegistroVisita() {
 
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
-                timeout: 10000,
+                timeout: 20000,
                 maximumAge: 120000
             })
 
+            hideWait()
             return {
                 latitud: location.coords.latitude,
                 longitud: location.coords.longitude

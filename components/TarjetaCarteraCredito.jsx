@@ -161,9 +161,7 @@ export default function TarjetaCarteraCredito({ cliente, isExpanded, onToggle })
                             {cliente.dias_mora > 0 && (
                                 <Text className="text-sm text-red-600 mb-1 font-medium">
                                     Se pone al corriente con:{" "}
-                                    {numeral(cliente.con_cuanto_se_pone_al_corriente).format(
-                                        "$0,0.00"
-                                    )}
+                                    {numeral(cliente.mora_total).format("$0,0.00")}
                                 </Text>
                             )}
                         </View>
