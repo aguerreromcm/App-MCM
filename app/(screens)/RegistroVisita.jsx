@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from "expo-router"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import * as ImageManipulator from "expo-image-manipulator"
 import * as Location from "expo-location"
-import * as FileSystem from "expo-file-system"
+import * as FileSystem from "expo-file-system/legacy"
 import { SafeAreaInsetsContext } from "react-native-safe-area-context"
 
 import { useCustomAlert } from "../../hooks/useCustomAlert"

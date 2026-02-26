@@ -1,7 +1,7 @@
 import { apiClient, API_CONFIG } from "./api"
 import { dateShortBack, dateTimeBack } from "../utils/date"
 import storage from "../utils/storage"
-import * as FileSystem from "expo-file-system"
+import * as FileSystem from "expo-file-system/legacy"
 
 export const registroPagos = {
     async convertirImagenABase64(uri) {

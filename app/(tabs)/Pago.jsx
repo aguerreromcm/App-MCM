@@ -22,7 +22,7 @@ import CustomAlert from "../../components/CustomAlert"
 import * as ImageManipulator from "expo-image-manipulator"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import * as Location from "expo-location"
-import * as FileSystem from "expo-file-system"
+import * as FileSystem from "expo-file-system/legacy"
 import { generarIdPago } from "../../utils/pagoId"
 import storage from "../../utils/storage"
 
