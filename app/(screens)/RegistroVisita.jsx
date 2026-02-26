@@ -489,72 +489,24 @@ export default function RegistroVisita() {
                             )}
                         </View>
 
-                        {/* Foto comprobante */}
+                        {/* Comprobante Fotográfico: botón de captura o vista previa */}
                         <View className="mb-6">
                             <Text className="text-sm font-medium text-gray-700 mb-2">
                                 Comprobante Fotográfico
                             </Text>
-                            <Pressable
-                                onPress={capturarFoto}
-                                className={`border-2 rounded-2xl p-6 items-center justify-center ${
-                                    fotoComprobante
-                                        ? "border-green-400 bg-green-50"
-                                        : "border-gray-300 bg-white"
-                                } h-32`}
-                            >
-                                {fotoComprobante ? (
-                                    <View className="items-center">
-                                        <MaterialIcons
-                                            name="check-circle"
-                                            size={40}
-                                            color="#16a34a"
-                                        />
-                                        <Text className="text-green-700 font-medium mt-2">
-                                            Foto capturada
-                                        </Text>
-                                        <Text className="text-green-600 text-sm">
-                                            Toque para cambiar
-                                        </Text>
-                                    </View>
-                                ) : (
+                            {!fotoComprobante ? (
+                                <Pressable
+                                    onPress={capturarFoto}
+                                    className="border-2 border-gray-300 bg-white rounded-2xl p-6 items-center justify-center h-32"
+                                >
                                     <View className="items-center">
                                         <Feather name="camera" size={40} color="#6B7280" />
                                         <Text className="text-gray-600 font-medium mt-2">
                                             Capturar foto
                                         </Text>
                                     </View>
-                                )}
-                            </Pressable>
-                        </View>
-
-                        {/* Campo de comentarios */}
-                        <View className="mb-6">
-                            <Text className="text-sm font-medium text-gray-700 mb-2">
-                                Comentarios
-                            </Text>
-                            <TextInput
-                                value={comentarios}
-                                onChangeText={setComentarios}
-                                className={`border-2 rounded-2xl p-4 h-36 ${
-                                    focusedField === "comentarios"
-                                        ? "border-green-400 bg-green-50"
-                                        : "border-gray-300 bg-white"
-                                }`}
-                                multiline
-                                numberOfLines={4}
-                                placeholder="Ingrese detalles adicionales sobre la visita..."
-                                onFocus={() => setFocusedField("comentarios")}
-                                onBlur={() => setFocusedField("")}
-                                textAlignVertical="top"
-                            />
-                        </View>
-
-                        {/* Vista previa de la foto */}
-                        {fotoComprobante && (
-                            <View className="mb-6">
-                                <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Vista Previa
-                                </Text>
+                                </Pressable>
+                            ) : (
                                 <View className="border-2 border-red-200 rounded-2xl p-4 bg-red-50">
                                     <Image
                                         source={{ uri: fotoComprobante.uri }}
@@ -580,8 +532,30 @@ export default function RegistroVisita() {
                                         </Pressable>
                                     </View>
                                 </View>
-                            </View>
-                        )}
+                            )}
+                        </View>
+
+                        {/* Campo de comentarios */}
+                        <View className="mb-6">
+                            <Text className="text-sm font-medium text-gray-700 mb-2">
+                                Comentarios
+                            </Text>
+                            <TextInput
+                                value={comentarios}
+                                onChangeText={setComentarios}
+                                className={`border-2 rounded-2xl p-4 h-36 ${
+                                    focusedField === "comentarios"
+                                        ? "border-green-400 bg-green-50"
+                                        : "border-gray-300 bg-white"
+                                }`}
+                                multiline
+                                numberOfLines={4}
+                                placeholder="Ingrese detalles adicionales sobre la visita..."
+                                onFocus={() => setFocusedField("comentarios")}
+                                onBlur={() => setFocusedField("")}
+                                textAlignVertical="top"
+                            />
+                        </View>
                     </View>
                 </ScrollView>
                 <View className="flex-row px-6 pt-2 border-t border-gray-200 justify-between">
