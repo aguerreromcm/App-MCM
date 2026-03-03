@@ -38,7 +38,10 @@ export default function Cartera() {
                     cliente.tipo_cartera !== "VIGENTE"
             )
             const clientesSinMora = clientesFiltrados.filter(
-                (cliente) => cliente.tipo_cartera === "VIGENTE"
+                (cliente) =>
+                    cliente.tipo_cartera === "VIGENTE" ||
+                    !cliente.mora_total ||
+                    parseFloat(cliente.mora_total) === 0
             )
 
             const grupos = {}
