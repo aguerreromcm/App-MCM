@@ -348,8 +348,6 @@ export default function DetalleCredito() {
                                     className={`px-3 py-1 rounded-full mr-3 ${
                                         datosDetalle?.tipoCartera === "VIGENTE"
                                             ? "bg-green-100"
-                                            : datosDetalle?.tipoCartera === "VENCIDA"
-                                            ? "bg-red-100"
                                             : "bg-yellow-100"
                                     }`}
                                 >
@@ -357,15 +355,21 @@ export default function DetalleCredito() {
                                         className={`text-sm font-medium ${
                                             datosDetalle?.tipoCartera === "VIGENTE"
                                                 ? "text-green-700"
-                                                : datosDetalle?.tipoCartera === "VENCIDA"
-                                                ? "text-red-700"
                                                 : "text-yellow-700"
                                         }`}
                                     >
                                         {datosDetalle?.tipoCartera || "Sin estado"}
                                     </Text>
                                 </View>
-
+                                {datosDetalle?.adicional === 1 && (
+                                    <View className="px-2 py-1 rounded-full mr-2 bg-purple-100">
+                                        <Text className="text-xs font-medium text-purple-700">
+                                            {datosDetalle?.adicional === 1
+                                                ? "Adicional"
+                                                : "Tradicional"}
+                                        </Text>
+                                    </View>
+                                )}
                                 {datosDetalle?.diasMora && parseInt(datosDetalle?.diasMora) > 0 && (
                                     <View className="bg-red-100 px-3 py-1 rounded-full">
                                         <Text className="text-sm font-medium text-red-700">

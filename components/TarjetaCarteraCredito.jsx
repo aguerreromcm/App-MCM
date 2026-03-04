@@ -49,7 +49,8 @@ export default function TarjetaCarteraCredito({ cliente, isExpanded, onToggle })
             fechaInicio: cliente.inicio || "",
             diasMora: cliente.dias_mora?.toString() || "0",
             moraTotal: cliente.mora_total?.toString() || "0",
-            fechaCalc: cliente.fecha_calc || ""
+            fechaCalc: cliente.fecha_calc || "",
+            adicional: cliente.adicional || 0
         }
 
         establecerDatosDetalle(datosCredito)
@@ -87,6 +88,13 @@ export default function TarjetaCarteraCredito({ cliente, isExpanded, onToggle })
                                 {cliente.tipo_cartera || "Sin estado"}
                             </Text>
                         </View>
+                        {cliente?.adicional === 1 && (
+                            <View className="px-2 py-1 rounded-full mr-2 bg-purple-100">
+                                <Text className="text-xs font-medium text-purple-700">
+                                    {cliente?.adicional === 1 ? "Adicional" : "Tradicional"}
+                                </Text>
+                            </View>
+                        )}
                         {cliente.dias_mora > 0 && (
                             <View className="bg-red-100 px-2 py-1 rounded-full">
                                 <Text className="text-xs font-medium text-red-700">
