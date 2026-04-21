@@ -31,14 +31,14 @@ export default function Cartera() {
 
     useEffect(() => {
         const agruparPorDia = () => {
-            const clientesConMora = clientesFiltrados.filter(
-                (cliente) =>
-                    cliente.mora_total &&
-                    parseFloat(cliente.mora_total) > 0 &&
-                    cliente.tipo_cartera !== "VIGENTE"
-            )
-            const clientesSinMora = clientesFiltrados.filter(
-                (cliente) => cliente.tipo_cartera === "VIGENTE"
+            const { clientesConMora, clientesSinMora } = clientesFiltrados.reduce(
+                (acc, cliente) => {
+                    if (cliente.tipo_cartera === "VIGENTE") acc.clientesSinMora.push(cliente)
+                    else acc.clientesConMora.push(cliente)
+
+                    return acc
+                },
+                { clientesConMora: [], clientesSinMora: [] }
             )
 
             const grupos = {}

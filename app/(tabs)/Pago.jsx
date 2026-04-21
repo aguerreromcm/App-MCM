@@ -108,7 +108,6 @@ export default function Pago() {
                 ])
             }
         }
-
         cargarTiposPago()
     }, [])
 
@@ -728,32 +727,39 @@ export default function Pago() {
                             </Pressable>
                             {showTipoSelect && (
                                 <View className="mt-2 border-2 border-gray-200 rounded-2xl bg-white shadow-sm">
-                                    {tiposPago.map((tipo, index) => (
-                                        <Pressable
-                                            key={tipo.codigo}
-                                            onPress={() => {
-                                                setTipoPago(tipo.codigo)
-                                                setShowTipoSelect(false)
-                                                setFocusedField("")
-                                            }}
-                                            className={`p-4 flex-row items-center justify-between ${
-                                                index < tiposPago.length - 1
-                                                    ? "border-b border-gray-100"
-                                                    : ""
-                                            }`}
-                                        >
-                                            <Text className="text-base font-medium text-gray-800 flex-1">
-                                                {tipo.descripcion}
-                                            </Text>
-                                            {tipoPago === tipo.codigo && (
-                                                <MaterialIcons
-                                                    name="check"
-                                                    size={20}
-                                                    color="#16a34a"
-                                                />
-                                            )}
-                                        </Pressable>
-                                    ))}
+                                    {tiposPago.map((tipo, index) => {
+                                        if (
+                                            infoCredito?.adicional == 1 &&
+                                            ["B", "E", "F", "A"].includes(tipo.codigo)
+                                        )
+                                            return null
+                                        return (
+                                            <Pressable
+                                                key={tipo.codigo}
+                                                onPress={() => {
+                                                    setTipoPago(tipo.codigo)
+                                                    setShowTipoSelect(false)
+                                                    setFocusedField("")
+                                                }}
+                                                className={`p-4 flex-row items-center justify-between ${
+                                                    index < tiposPago.length - 1
+                                                        ? "border-b border-gray-100"
+                                                        : ""
+                                                }`}
+                                            >
+                                                <Text className="text-base font-medium text-gray-800 flex-1">
+                                                    {tipo.descripcion}
+                                                </Text>
+                                                {tipoPago === tipo.codigo && (
+                                                    <MaterialIcons
+                                                        name="check"
+                                                        size={20}
+                                                        color="#16a34a"
+                                                    />
+                                                )}
+                                            </Pressable>
+                                        )
+                                    })}
                                 </View>
                             )}
                         </View>
