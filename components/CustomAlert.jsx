@@ -83,7 +83,7 @@ export default forwardRef(function CustomAlert(props, ref) {
                 })
             ]).start()
         }
-    }, [visible])
+    }, [visible, fadeAnim, scaleAnim])
 
     useEffect(() => {
         if (waitVisible) {
@@ -113,7 +113,7 @@ export default forwardRef(function CustomAlert(props, ref) {
                 useNativeDriver: true
             }).start()
         }
-    }, [waitVisible])
+    }, [waitVisible, waitFadeAnim, waitRotateAnim])
 
     const showAlert = (type = "simple", title, message, buttons = []) => {
         const defaultButtons =

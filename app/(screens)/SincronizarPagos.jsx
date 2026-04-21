@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react"
+import { useContext, useState, useEffect, useCallback } from "react"
 import {
     View,
     Text,
@@ -30,9 +30,27 @@ export default function SincronizarPagos() {
     const [modalComprobanteVisible, setModalComprobanteVisible] = useState(false)
     const [comprobanteSeleccionado, setComprobanteSeleccionado] = useState(null)
 
+    const cargarPagos = useCallback(async () => {
+        try {
+            setLoading(true)
+            const todosPagos = await pagosPendientes.obtenerTodos()
+            setPagos(todosPagos)
+            setPagosFiltrados(todosPagos)
+            const todosIds = new Set(todosPagos.map((pago) => pago.id))
+            setPagosSeleccionados(todosIds)
+        } catch (error) {
+            console.error("Error al cargar pagos:", error)
+            showError("Error", "No se pudieron cargar los pagos pendientes", [
+                { text: "OK", style: "default" }
+            ])
+        } finally {
+            setLoading(false)
+        }
+    }, [showError])
+
     useEffect(() => {
         cargarPagos()
-    }, [])
+    }, [cargarPagos])
 
     // Efecto para filtrar pagos cuando cambia el término de búsqueda
     useEffect(() => {
@@ -49,24 +67,6 @@ export default function SincronizarPagos() {
             setPagosFiltrados(pagos)
         }
     }, [terminoBusqueda, pagos])
-
-    const cargarPagos = async () => {
-        try {
-            setLoading(true)
-            const todosPagos = await pagosPendientes.obtenerTodos()
-            setPagos(todosPagos)
-            setPagosFiltrados(todosPagos)
-            const todosIds = new Set(todosPagos.map((pago) => pago.id))
-            setPagosSeleccionados(todosIds)
-        } catch (error) {
-            console.error("Error al cargar pagos:", error)
-            showError("Error", "No se pudieron cargar los pagos pendientes", [
-                { text: "OK", style: "default" }
-            ])
-        } finally {
-            setLoading(false)
-        }
-    }
 
     const toggleSeleccionPago = (pagoId) => {
         const nuevosSeleccionados = new Set(pagosSeleccionados)
@@ -99,6 +99,9 @@ export default function SincronizarPagos() {
         }
     }
 
+    // Actualmente no está invocado en la UI (el botón de eliminar está comentado),
+    // se mantiene para uso futuro.
+    // eslint-disable-next-line no-unused-vars
     const eliminarPago = async (pagoId) => {
         showInfo("Eliminar Pago", "¿Está seguro de que desea eliminar este pago pendiente?", [
             {

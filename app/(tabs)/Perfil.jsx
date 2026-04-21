@@ -44,7 +44,7 @@ export default function Perfil() {
                                     "Ocurrió un problema al cerrar tu sesión. Por favor, inténtalo de nuevo."
                                 )
                             }
-                        } catch (error) {
+                        } catch (_error) {
                             showError(
                                 "Error inesperado",
                                 "Ocurrió un error inesperado al cerrar la sesión. La aplicación se reiniciará."

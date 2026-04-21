@@ -54,7 +54,7 @@ export default function RegistroVisita() {
                 { text: "OK", onPress: () => router.back() }
             ])
         }
-    }, [params])
+    }, [params, showError])
 
     // Cargar motivos de visita desde catálogos
     useEffect(() => {
@@ -71,7 +71,7 @@ export default function RegistroVisita() {
         }
 
         cargarMotivosVisita()
-    }, [])
+    }, [showError])
 
     const limpiarFotoTemporal = async (uri) => {
         try {
@@ -284,7 +284,7 @@ export default function RegistroVisita() {
             showSuccess("¡Foto Capturada!", "El comprobante ha sido capturado correctamente", [
                 { text: "OK", style: "default" }
             ])
-        } catch (error) {
+        } catch (_error) {
             showError("Error", "No se pudo capturar la foto. Inténtelo de nuevo.", [
                 { text: "OK", style: "default" }
             ])

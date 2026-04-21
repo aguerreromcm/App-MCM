@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect, useRef } from "react"
+import { useContext, useState, useEffect, useRef, useCallback } from "react"
 import { View, Text, TextInput, Pressable, ScrollView, FlatList } from "react-native"
 import { Feather, MaterialIcons } from "@expo/vector-icons"
 import { router } from "expo-router"
@@ -10,18 +10,15 @@ import CustomAlert from "../../components/CustomAlert"
 import DateSelector from "../../components/DateSelector"
 import MapModal from "../../components/MapModal"
 import TarjetaResumenOperacion from "../../components/TarjetaResumenOperacion"
-import storage from "../../utils/storage"
+import { getUser } from "../../utils/storage"
 import numeral from "numeral"
 import { dateShortBack, dateShortFront, dateTimeFront } from "../../utils/date"
 
 export default function Resumen() {
     const insets = useContext(SafeAreaInsetsContext)
     const { alertRef, showError, showWait, hideWait, showInfo } = useCustomAlert()
-    const { obtenerDetalleOperaciones, obtenerResumenDiario, lastUpdate } = useCartera()
+    const { obtenerDetalleOperaciones, obtenerResumenDiario } = useCartera()
     const [expandedId, setExpandedId] = useState(null)
-
-    // Estados para el usuario
-    const [usuario, setUsuario] = useState(null)
 
     // Estados para las fechas
     const [fechaInicio, setFechaInicio] = useState(null)
@@ -50,29 +47,10 @@ export default function Resumen() {
 
     const scrollViewRef = useRef(null)
 
-    useEffect(() => {
-        inicializarDatos()
-    }, [])
-
-    useEffect(() => {
-        if (fechaInicio && fechaFin) {
-            if (fechaInicio > fechaFin) {
-                showError("Error de Fechas", "La fecha de inicio debe ser menor a la fecha fin")
-                return
-            }
-            buscarResumen()
-        }
-    }, [fechaInicio, fechaFin])
-
-    useEffect(() => {
-        filtrarYOrdenarOperaciones()
-    }, [operaciones, busqueda, ordenamiento, ordenAscendente])
-
-    const inicializarDatos = async () => {
+    const inicializarDatos = useCallback(async () => {
         try {
-            // Obtener datos del usuario
-            const userData = await storage.getUser()
-            setUsuario(userData)
+            // Obtener datos del usuario (se consulta para validar sesión)
+            await getUser()
 
             // Configurar fechas por defecto
             const hoy = new Date()
@@ -92,36 +70,9 @@ export default function Resumen() {
             console.error("Error al inicializar datos:", error)
             showError("Error", "No se pudieron cargar los datos del usuario")
         }
-    }
+    }, [showError])
 
-    const buscarResumen = async () => {
-        if (!fechaInicio || !fechaFin) return
-
-        try {
-            showWait("Cargando Resumen", "Obteniendo los datos de pagos registrados...")
-
-            const resultado = await resumenDiario.obtenerResumen(
-                dateShortBack(fechaInicio),
-                dateShortBack(fechaFin)
-            )
-
-            if (resultado.success) {
-                setResumenData(resultado.data.resumen_diario)
-                setOperaciones(resultado.data.detalle_operaciones || [])
-                setMostrarTodos(false)
-                setMostrarBusqueda(false)
-            } else {
-                await usarDatosFallback()
-            }
-        } catch (error) {
-            await usarDatosFallback()
-        } finally {
-            hideWait()
-        }
-    }
-
-    // Usar datos del contexto y pagos pendientes locales como fallback
-    const usarDatosFallback = async () => {
+    const usarDatosFallback = useCallback(async () => {
         try {
             const resumenCache = obtenerResumenDiario()
             const operacionesCache = obtenerDetalleOperaciones() || []
@@ -176,9 +127,35 @@ export default function Resumen() {
                 { text: "OK", style: "default" }
             ])
         }
-    }
+    }, [obtenerResumenDiario, obtenerDetalleOperaciones, showInfo, showError, hideWait])
 
-    const filtrarYOrdenarOperaciones = () => {
+    const buscarResumen = useCallback(async () => {
+        if (!fechaInicio || !fechaFin) return
+
+        try {
+            showWait("Cargando Resumen", "Obteniendo los datos de pagos registrados...")
+
+            const resultado = await resumenDiario.obtenerResumen(
+                dateShortBack(fechaInicio),
+                dateShortBack(fechaFin)
+            )
+
+            if (resultado.success) {
+                setResumenData(resultado.data.resumen_diario)
+                setOperaciones(resultado.data.detalle_operaciones || [])
+                setMostrarTodos(false)
+                setMostrarBusqueda(false)
+            } else {
+                await usarDatosFallback()
+            }
+        } catch (_error) {
+            await usarDatosFallback()
+        } finally {
+            hideWait()
+        }
+    }, [fechaInicio, fechaFin, showWait, hideWait, usarDatosFallback])
+
+    const filtrarYOrdenarOperaciones = useCallback(() => {
         let filtradas = [...operaciones]
 
         // Filtrar por búsqueda
@@ -211,7 +188,25 @@ export default function Resumen() {
         })
 
         setOperacionesFiltradas(filtradas)
-    }
+    }, [operaciones, busqueda, ordenamiento, ordenAscendente])
+
+    useEffect(() => {
+        inicializarDatos()
+    }, [inicializarDatos])
+
+    useEffect(() => {
+        if (fechaInicio && fechaFin) {
+            if (fechaInicio > fechaFin) {
+                showError("Error de Fechas", "La fecha de inicio debe ser menor a la fecha fin")
+                return
+            }
+            buscarResumen()
+        }
+    }, [fechaInicio, fechaFin, showError, buscarResumen])
+
+    useEffect(() => {
+        filtrarYOrdenarOperaciones()
+    }, [filtrarYOrdenarOperaciones])
 
     const mostrarUbicacion = (operacion) => {
         setUbicacionSeleccionada({

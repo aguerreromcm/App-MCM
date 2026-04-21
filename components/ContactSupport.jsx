@@ -1,4 +1,4 @@
-import { Pressable, Text, Linking, Platform } from "react-native"
+import { Pressable, Linking, Platform } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useCustomAlert } from "../hooks/useCustomAlert"
 import CustomAlert from "./CustomAlert"
@@ -60,7 +60,7 @@ export default function ContactSupport() {
                 // Si no puede abrir la app, usar WhatsApp Web
                 await Linking.openURL(webWhatsappUrl)
             }
-        } catch (error) {
+        } catch (_error) {
             showError(
                 "Error al abrir WhatsApp",
                 "No se pudo abrir WhatsApp. Verifica que tengas la aplicación instalada."
@@ -83,7 +83,7 @@ export default function ContactSupport() {
                     const dialerUrl = `tel:${cleanPhoneNumber}`
                     try {
                         await Linking.openURL(dialerUrl)
-                    } catch (androidError) {
+                    } catch (_androidError) {
                         showError(
                             "Error al realizar llamada",
                             "No se encontró una aplicación de teléfono en este dispositivo."
@@ -96,7 +96,7 @@ export default function ContactSupport() {
                     )
                 }
             }
-        } catch (error) {
+        } catch (_error) {
             showError(
                 "Error al realizar llamada",
                 "Ocurrió un error al intentar realizar la llamada. Verifica que tengas una aplicación de teléfono instalada."

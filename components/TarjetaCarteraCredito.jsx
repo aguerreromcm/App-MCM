@@ -19,7 +19,7 @@ export default function TarjetaCarteraCredito({ cliente, isExpanded, onToggle })
             duration: 300,
             useNativeDriver: false
         }).start()
-    }, [isExpanded])
+    }, [isExpanded, animatedHeight])
 
     const expandedHeight = animatedHeight.interpolate({
         inputRange: [0, 1],

@@ -24,7 +24,7 @@ import { CameraView, useCameraPermissions } from "expo-camera"
 import * as Location from "expo-location"
 import * as FileSystem from "expo-file-system/legacy"
 import { generarIdPago } from "../../utils/pagoId"
-import storage from "../../utils/storage"
+import { getUser } from "../../utils/storage"
 
 export default function Pago() {
     const params = useLocalSearchParams()
@@ -92,7 +92,7 @@ export default function Pago() {
             setCreditoValido(null)
             setInfoCredito(null)
         }
-    }, [credito, validarCredito, esDetalleCredito])
+    }, [credito, validarCredito, esDetalleCredito, showError])
 
     useEffect(() => {
         const cargarTiposPago = async () => {
@@ -344,7 +344,7 @@ export default function Pago() {
             showWait("Procesando Pago", "Registrando el pago, por favor espere...")
 
             // Obtener información del pago a registrar
-            const usuario = await storage.getUser()
+            const usuario = await getUser()
             const usuarioId = usuario?.id_usuario || "UNKNOWN"
             const fechaCaptura = new Date()
             const idPago = await generarIdPago(credito, fechaCaptura, usuarioId, monto)
@@ -503,7 +503,7 @@ export default function Pago() {
             showSuccess("¡Foto Capturada!", "El comprobante ha sido capturado correctamente", [
                 { text: "OK", style: "default" }
             ])
-        } catch (error) {
+        } catch (_error) {
             showError("Error", "No se pudo capturar la foto. Inténtelo de nuevo.", [
                 { text: "OK", style: "default" }
             ])
@@ -729,7 +729,7 @@ export default function Pago() {
                                 <View className="mt-2 border-2 border-gray-200 rounded-2xl bg-white shadow-sm">
                                     {tiposPago.map((tipo, index) => {
                                         if (
-                                            infoCredito?.adicional == 1 &&
+                                            infoCredito?.adicional === 1 &&
                                             ["B", "E", "F", "A"].includes(tipo.codigo)
                                         )
                                             return null

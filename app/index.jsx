@@ -2,15 +2,14 @@ import { StatusBar } from "expo-status-bar"
 import { router } from "expo-router"
 import { useContext, useEffect } from "react"
 import { View, ActivityIndicator } from "react-native"
-import { SafeAreaProvider } from "react-native-safe-area-context"
-import { SafeAreaInsetsContext } from "react-native-safe-area-context"
+import { SafeAreaProvider, SafeAreaInsetsContext } from "react-native-safe-area-context"
 import { useSession } from "../context/SessionContext"
 import { COLORS } from "../constants"
 import Login from "../components/Login"
 import IntroSlides from "../components/IntroSlides"
 import { sesion } from "../services"
 
-export default function index() {
+export default function Index() {
     const insets = useContext(SafeAreaInsetsContext)
     const { token, isLoading, introOK, introMostrada } = useSession()
 

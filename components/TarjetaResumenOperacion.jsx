@@ -20,7 +20,7 @@ export default function TarjetaResumenOperacion({
             duration: 300,
             useNativeDriver: false
         }).start()
-    }, [expandida])
+    }, [expandida, animatedHeight])
 
     const expandedHeight = animatedHeight.interpolate({
         inputRange: [0, 1],

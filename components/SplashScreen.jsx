@@ -39,7 +39,7 @@ export default function SplashScreen({ onFinish }) {
         ]).start(() => {
             if (onFinish) onFinish()
         })
-    }, [])
+    }, [backgroundOpacity, logoOpacity, logoScale, onFinish])
 
     return (
         <Animated.View

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react"
+import { useContext, useEffect, useState, useCallback } from "react"
 import { View, Text, Pressable, ScrollView, Alert, Modal, Image, Animated } from "react-native"
 import { PanGestureHandler, State } from "react-native-gesture-handler"
 import { router, useFocusEffect } from "expo-router"
@@ -6,7 +6,6 @@ import { Feather, MaterialIcons, MaterialCommunityIcons, FontAwesome5 } from "@e
 import { creditos, pagosPendientes } from "../../services"
 import { SafeAreaInsetsContext } from "react-native-safe-area-context"
 import numeral from "numeral"
-import { useCallback } from "react"
 import { usePago } from "../../context/PagoContext"
 import { useDetalle } from "../../context/DetalleContext"
 import CustomAlert from "../../components/CustomAlert"
@@ -50,6 +49,9 @@ export default function DetalleCredito() {
         }
     }
 
+    // Actualmente el botón de eliminar está comentado en TransaccionPendiente,
+    // se mantiene la función para uso futuro.
+    // eslint-disable-next-line no-unused-vars
     const eliminarPago = async (pagoId) => {
         showError("Eliminar Pago", "¿Está seguro de que desea eliminar este pago pendiente?", [
             {
@@ -115,7 +117,7 @@ export default function DetalleCredito() {
         }
 
         getDetalle()
-    }, [])
+    }, [datosDetalle?.noCredito, datosDetalle?.ciclo])
 
     useFocusEffect(
         useCallback(() => {
@@ -126,7 +128,7 @@ export default function DetalleCredito() {
                 setPagosPendientesCredito(pagosPendientes_)
             }
             cargarPagosPendientes()
-        }, [])
+        }, [datosDetalle?.noCredito])
     )
 
     const resumenDetalle = () => {
@@ -312,7 +314,6 @@ export default function DetalleCredito() {
         const f = filtroTipoMov.toLowerCase()
         const mt = movTipo.toLowerCase()
         if (f === "otros") {
-            const ft = filtroXtipo.filter((t) => t !== "otros")
             return !filtroXtipo.some((t) => mt.includes(t))
         }
 

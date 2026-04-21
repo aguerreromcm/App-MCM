@@ -1,31 +1,9 @@
-import { useState, useEffect } from "react"
 import { View, Text, Modal, Pressable, Dimensions } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import { COLORS } from "../constants"
 
 const { width, height } = Dimensions.get("window")
 
 export default function MapModal({ visible, onClose, latitud, longitud, nombreCliente, credito }) {
-    const [mapUrl, setMapUrl] = useState("")
-
-    useEffect(() => {
-        if (visible && latitud && longitud) {
-            // Crear URL para mostrar un mapa estático de Google Maps
-            const zoom = 15 // Acercamiento medio
-            const size = `${Math.floor(width * 0.8)}x${Math.floor(height * 0.6)}`
-            const url = `https://maps.googleapis.com/maps/api/staticmap?center=${latitud},${longitud}&zoom=${zoom}&size=${size}&markers=color:purple%7C${latitud},${longitud}&key=YOUR_API_KEY`
-
-            // Para desarrollo, usaremos OpenStreetMap
-            const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${
-                parseFloat(longitud) - 0.01
-            },${parseFloat(latitud) - 0.01},${parseFloat(longitud) + 0.01},${
-                parseFloat(latitud) + 0.01
-            }&layer=mapnik&marker=${latitud},${longitud}`
-
-            setMapUrl(osmUrl)
-        }
-    }, [visible, latitud, longitud])
-
     return (
         <Modal
             visible={visible}

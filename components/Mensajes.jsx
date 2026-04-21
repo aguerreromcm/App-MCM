@@ -1,6 +1,5 @@
 import { View, Text, Pressable, ScrollView } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import { COLORS } from "../constants"
 import CustomAlert from "./CustomAlert"
 import { useCustomAlert } from "../hooks/useCustomAlert"
 
